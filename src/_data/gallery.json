@@ -6,9 +6,9 @@
       "alt": "DARE volunteer teams working on site"
     },
     {
-      "image": "",
-      "caption": "Roof repair in progress",
-      "alt": "Volunteers repairing a roof"
+      "image": "/images/uploads/img_4133.jpeg",
+      "caption": "Fence repair",
+      "alt": "Volunteers repaiFence repairring a roof"
     },
     {
       "image": "",
@@ -16,14 +16,14 @@
       "alt": "Community partners gathering for disaster relief"
     },
     {
-      "image": "",
-      "caption": "Completed home restoration",
-      "alt": "A completed home restoration project"
+      "image": "/images/uploads/img_4142.jpeg",
+      "caption": "Fence Repair",
+      "alt": "Fence Repair"
     },
     {
-      "image": "",
-      "caption": "Team deployment preparation",
-      "alt": "Team preparing for a deployment"
+      "image": "/images/uploads/img_4139.jpeg",
+      "caption": "Cutting fence boards",
+      "alt": "Cutting fence boards"
     },
     {
       "image": "",
@@ -38,6 +38,11 @@
     {
       "caption": "Volunteer teams on site",
       "alt": "Volunteer teams on site"
+    },
+    {
+      "image": "/images/uploads/IMG_4128.jpeg",
+      "caption": "Wearing the colors",
+      "alt": "Wearing the colors"
     }
   ]
 }
