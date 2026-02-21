@@ -1,7 +1,7 @@
 {
   "items": [
     {
-      "image": "",
+      "image": "/images/uploads/img_4117.jpeg",
       "caption": "Volunteer teams on site",
       "alt": "DARE volunteer teams working on site"
     },
@@ -29,6 +29,15 @@
       "image": "",
       "caption": "Homeowner celebration",
       "alt": "Celebrating with a homeowner after project completion"
+    },
+    {
+      "image": "/images/uploads/img_4142.jpeg",
+      "caption": "Volunteer teams on site",
+      "alt": "Volunteer teams on site"
+    },
+    {
+      "caption": "Volunteer teams on site",
+      "alt": "Volunteer teams on site"
     }
   ]
 }
