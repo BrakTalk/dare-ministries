@@ -1,5 +1,6 @@
 backend:
-  name: git-gateway
+  name: github
+  repo: BrakTalk/dare-ministries
   branch: master
 
 media_folder: "src/images/uploads"

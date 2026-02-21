@@ -7,10 +7,13 @@ redirects = []
 [functions."*"]
 
 [build]
-publish = "/Users/mason/WebstormProjects/dare-ministries"
-publishOrigin = "default"
+publish = "/Users/mason/WebstormProjects/dare-ministries/_site"
+publishOrigin = "config"
+commandOrigin = "config"
+command = "npx @11ty/eleventy"
 
 [build.environment]
+NODE_VERSION = "20"
 
 [build.processing]
 
