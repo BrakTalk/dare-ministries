@@ -70,42 +70,48 @@ collections:
   # --- Projects ---
   - name: "projects"
     label: "Projects"
-    file: "src/_data/projects.json"
     editor:
       preview: false
-    fields:
-      - name: "items"
-        label: "Projects"
-        label_singular: "Project"
-        widget: "list"
+    files:
+      - name: "project-list"
+        label: "Project List"
+        file: "src/_data/projects.json"
         fields:
-          - { name: "title", label: "Project Title", widget: "string" }
-          - { name: "location", label: "Location", widget: "string" }
-          - { name: "description", label: "Description", widget: "text" }
-          - name: "status"
-            label: "Status"
-            widget: "select"
-            options:
-              - { label: "Active", value: "active" }
-              - { label: "Planning", value: "planning" }
-              - { label: "Completed", value: "completed" }
-          - { name: "accepting_volunteers", label: "Accepting Volunteers?", widget: "boolean", default: true }
+          - name: "items"
+            label: "Projects"
+            label_singular: "Project"
+            widget: "list"
+            fields:
+              - { name: "title", label: "Project Title", widget: "string" }
+              - { name: "location", label: "Location", widget: "string" }
+              - { name: "description", label: "Description", widget: "text" }
+              - name: "status"
+                label: "Status"
+                widget: "select"
+                options:
+                  - { label: "Active", value: "active" }
+                  - { label: "Planning", value: "planning" }
+                  - { label: "Completed", value: "completed" }
+              - { name: "accepting_volunteers", label: "Accepting Volunteers?", widget: "boolean", default: true }
 
   # --- Gallery ---
   - name: "gallery"
     label: "Photo Gallery"
-    file: "src/_data/gallery.json"
     editor:
       preview: false
-    fields:
-      - name: "items"
+    files:
+      - name: "photo-gallery"
         label: "Gallery Photos"
-        label_singular: "Photo"
-        widget: "list"
+        file: "src/_data/gallery.json"
         fields:
-          - { name: "image", label: "Photo", widget: "image", required: false }
-          - { name: "caption", label: "Caption", widget: "string" }
-          - { name: "alt", label: "Alt Text (accessibility)", widget: "string" }
+          - name: "items"
+            label: "Photos"
+            label_singular: "Photo"
+            widget: "list"
+            fields:
+              - { name: "image", label: "Photo", widget: "image", required: false }
+              - { name: "caption", label: "Caption", widget: "string" }
+              - { name: "alt", label: "Alt Text (accessibility)", widget: "string" }
 
   # --- Blog Posts ---
   - name: "posts"
