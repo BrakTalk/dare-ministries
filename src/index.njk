@@ -1,0 +1,442 @@
+---
+layout: false
+---
+{% from "icons.njk" import icon %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ site.title }} — Disaster Aid Recovery and Effort</title>
+  <meta name="description" content="{{ site.description }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700;900&family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+</head>
+<body>
+
+  <!-- Navigation -->
+  <nav class="navbar" id="navbar">
+    <div class="nav-container">
+      <a href="#home" class="nav-logo">
+        <span class="logo-dare">D.A.R.E.</span>
+        <span class="logo-sub">Ministries</span>
+      </a>
+      <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+      <ul class="nav-links" id="navLinks">
+        <li><a href="#home">Home</a></li>
+        <li><a href="#about">About</a></li>
+        <li><a href="#projects">Projects</a></li>
+        <li><a href="#gallery">Gallery</a></li>
+        <li><a href="#volunteer">Get Involved</a></li>
+        <li><a href="#donate" class="nav-donate">Donate</a></li>
+        <li><a href="#contact">Contact</a></li>
+        {% if collections.posts | length %}
+        <li><a href="#updates">Updates</a></li>
+        {% endif %}
+      </ul>
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <section class="hero" id="home">
+    <div class="hero-overlay"></div>
+    <div class="hero-content">
+      <h1>{{ site.tagline }}</h1>
+      <p class="hero-subtitle">{{ site.subtitle }}</p>
+      <p class="hero-text">{{ site.description }}</p>
+      <div class="hero-buttons">
+        <a href="#volunteer" class="btn btn-primary">Join a Team</a>
+        <a href="#about" class="btn btn-outline">Our Mission</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Mission Stats Bar -->
+  <section class="stats-bar">
+    <div class="container stats-grid">
+      <div class="stat">
+        <span class="stat-number">Long-Term</span>
+        <span class="stat-label">Recovery Commitment</span>
+      </div>
+      <div class="stat">
+        <span class="stat-number">All Welcome</span>
+        <span class="stat-label">No Skills Required</span>
+      </div>
+      <div class="stat">
+        <span class="stat-number">$0</span>
+        <span class="stat-label">Cost to Volunteer</span>
+      </div>
+      <div class="stat">
+        <span class="stat-number">Georgia</span>
+        <span class="stat-label">Communities Served</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- About Section -->
+  <section class="section about" id="about">
+    <div class="container">
+      <div class="section-header">
+        <h2>Our Mission</h2>
+        <div class="section-divider"></div>
+      </div>
+      <div class="about-grid">
+        <div class="about-text">
+          <h3>{{ site.about.heading }}</h3>
+          {% for paragraph in site.about.paragraphs %}
+          <p>{{ paragraph | safe }}</p>
+          {% endfor %}
+          <blockquote>
+            <p>"{{ site.scripture }}"</p>
+          </blockquote>
+        </div>
+        <div class="about-image">
+          <div class="image-placeholder">
+            <div class="placeholder-icon">
+              {{ icon("home", 64) }}
+            </div>
+            <p>Volunteers rebuilding homes in Georgia</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- What We Do Section -->
+  <section class="section what-we-do">
+    <div class="container">
+      <div class="section-header">
+        <h2>What We Do</h2>
+        <div class="section-divider"></div>
+      </div>
+      <div class="services-grid">
+        {% for service in site.services %}
+        <div class="service-card">
+          <div class="service-icon">
+            {{ icon(service.icon) }}
+          </div>
+          <h3>{{ service.title }}</h3>
+          <p>{{ service.description }}</p>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <!-- Current Projects Section -->
+  <section class="section projects" id="projects">
+    <div class="container">
+      <div class="section-header">
+        <h2>Current Projects</h2>
+        <div class="section-divider"></div>
+        <p class="section-subtitle">Where we're working right now</p>
+      </div>
+      <div class="projects-grid">
+        {% for project in projects.items %}
+        <div class="project-card">
+          <div class="project-location">
+            {{ icon("map-pin", 20) }}
+            {{ project.location }}
+          </div>
+          <h3>{{ project.title }}</h3>
+          <p>{{ project.description }}</p>
+          <div class="project-status">
+            <span class="status-badge {{ project.status }}">{{ project.status | capitalize }}</span>
+            {% if project.accepting_volunteers %}
+            <span class="project-detail">Accepting volunteers</span>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="projects-cta">
+        <p>Know a community that needs help? <a href="#contact">Get in touch</a> and let us know.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Gallery Section -->
+  <section class="section gallery" id="gallery">
+    <div class="container">
+      <div class="section-header">
+        <h2>Our Work</h2>
+        <div class="section-divider"></div>
+        <p class="section-subtitle">Stories of recovery and hope from the field</p>
+      </div>
+      <div class="gallery-grid">
+        {% for item in gallery.items %}
+        <div class="gallery-item">
+          {% if item.image %}
+          <img src="{{ item.image }}" alt="{{ item.alt }}" loading="lazy">
+          <span class="gallery-caption">{{ item.caption }}</span>
+          {% else %}
+          <div class="gallery-placeholder">
+            <span>{{ item.caption }}</span>
+          </div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      <p class="gallery-note"><em>Have photos from a DARE deployment? Send them to <a href="mailto:{{ site.contact.email }}">{{ site.contact.email }}</a></em></p>
+    </div>
+  </section>
+
+  <!-- Blog/Updates Section -->
+  {% if collections.posts | length %}
+  <section class="section updates" id="updates">
+    <div class="container">
+      <div class="section-header">
+        <h2>Updates</h2>
+        <div class="section-divider"></div>
+        <p class="section-subtitle">News from the field</p>
+      </div>
+      <div class="posts-grid">
+        {% for post in collections.posts | reverse %}
+        <article class="post-card">
+          {% if post.data.image %}
+          <div class="post-image">
+            <img src="{{ post.data.image }}" alt="{{ post.data.title }}" loading="lazy">
+          </div>
+          {% endif %}
+          <div class="post-content">
+            <time class="post-date" datetime="{{ post.date | date('YYYY-MM-DD') }}">{{ post.date | date("MMMM D, YYYY") }}</time>
+            <h3>{{ post.data.title }}</h3>
+            <p>{{ post.data.summary | default(post.content | striptags | truncate(150)) }}</p>
+          </div>
+        </article>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  <!-- Volunteer Section -->
+  <section class="section volunteer" id="volunteer">
+    <div class="container">
+      <div class="section-header">
+        <h2>Get Involved</h2>
+        <div class="section-divider"></div>
+      </div>
+      <div class="volunteer-grid">
+        <div class="volunteer-info">
+          <h3>Join a D.A.R.E. Team</h3>
+          <p>There is <strong>no charge</strong> to join a DARE team and <strong>no special skills are required</strong>. Whether you can swing a hammer or have never held one, there is meaningful work for you.</p>
+          <div class="volunteer-perks">
+            {% set perks = [
+              "Free to volunteer — no fees or costs",
+              "Overnight lodging provided",
+              "Meals provided during deployment",
+              "No experience necessary",
+              "Church groups & individuals welcome"
+            ] %}
+            {% for perk in perks %}
+            <div class="perk">
+              {{ icon("check", 24) }}
+              <span>{{ perk }}</span>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="volunteer-form-container">
+          <form class="volunteer-form" id="volunteerForm" name="volunteer" method="POST" data-netlify="true" netlify-honeypot="bot-field">
+            <input type="hidden" name="form-name" value="volunteer">
+            <p style="display:none"><label>Don't fill this out: <input name="bot-field"></label></p>
+            <h4>Volunteer Interest Form</h4>
+            <div class="form-group">
+              <label for="name">Full Name *</label>
+              <input type="text" id="name" name="name" required>
+            </div>
+            <div class="form-group">
+              <label for="email">Email Address *</label>
+              <input type="email" id="email" name="email" required>
+            </div>
+            <div class="form-group">
+              <label for="phone">Phone Number</label>
+              <input type="tel" id="phone" name="phone">
+            </div>
+            <div class="form-group">
+              <label for="church">Church or Organization</label>
+              <input type="text" id="church" name="church" placeholder="e.g., Roswell UMC">
+            </div>
+            <div class="form-group">
+              <label for="skills">Skills or Experience</label>
+              <textarea id="skills" name="skills" rows="3" placeholder="Any construction, medical, cooking, or other skills you'd like to share (none required!)"></textarea>
+            </div>
+            <div class="form-group">
+              <label for="availability">Availability</label>
+              <select id="availability" name="availability">
+                <option value="">Select your availability</option>
+                <option value="weekdays">Weekdays</option>
+                <option value="weekends">Weekends</option>
+                <option value="multi-day">Multi-day deployments (3+ days)</option>
+                <option value="flexible">Flexible / Any time</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="message">Anything else we should know?</label>
+              <textarea id="message" name="message" rows="3"></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary btn-full">Sign Up to Volunteer</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Donate Section -->
+  <section class="section donate" id="donate">
+    <div class="donate-overlay"></div>
+    <div class="container">
+      <div class="donate-content">
+        <h2>{{ site.donate.heading }}</h2>
+        <p>{{ site.donate.description }}</p>
+        <div class="donate-options">
+          {% if site.donate.url %}
+          <a href="{{ site.donate.url }}" class="btn btn-primary btn-large" target="_blank" rel="noopener">Make a Donation</a>
+          {% else %}
+          <a href="mailto:{{ site.contact.email }}?subject=Donation%20Inquiry%20-%20DARE%20Ministries" class="btn btn-primary btn-large">Make a Donation</a>
+          {% endif %}
+        </div>
+        <p class="donate-note">{{ site.donate.note }} Contact us at <a href="mailto:{{ site.contact.email }}">{{ site.contact.email }}</a> or call <a href="tel:+17063402221">{{ site.contact.phone }}</a>.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Contact Section -->
+  <section class="section contact" id="contact">
+    <div class="container">
+      <div class="section-header">
+        <h2>Contact Us</h2>
+        <div class="section-divider"></div>
+      </div>
+      <div class="contact-grid">
+        <div class="contact-info">
+          <h3>Get in Touch</h3>
+          <p>Whether you want to volunteer, donate, request assistance, or bring your church group on a deployment, we'd love to hear from you.</p>
+          <div class="contact-details">
+            <div class="contact-item">
+              {{ icon("user", 24) }}
+              <div>
+                <strong>{{ site.contact.name }}</strong>
+                <span>{{ site.contact.title }}</span>
+              </div>
+            </div>
+            <div class="contact-item">
+              {{ icon("mail", 24) }}
+              <div>
+                <a href="mailto:{{ site.contact.email }}">{{ site.contact.email }}</a>
+              </div>
+            </div>
+            <div class="contact-item">
+              {{ icon("phone", 24) }}
+              <div>
+                <a href="tel:+17063402221">{{ site.contact.phone }}</a>
+              </div>
+            </div>
+            <div class="contact-item">
+              {{ icon("map-pin", 24) }}
+              <div>
+                <span>Serving communities across Georgia</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="contact-form-container">
+          <form class="contact-form" name="contact" method="POST" data-netlify="true" netlify-honeypot="bot-field">
+            <input type="hidden" name="form-name" value="contact">
+            <p style="display:none"><label>Don't fill this out: <input name="bot-field"></label></p>
+            <h4>Send Us a Message</h4>
+            <div class="form-group">
+              <label for="contact-name">Your Name *</label>
+              <input type="text" id="contact-name" name="name" required>
+            </div>
+            <div class="form-group">
+              <label for="contact-email">Email Address *</label>
+              <input type="email" id="contact-email" name="email" required>
+            </div>
+            <div class="form-group">
+              <label for="contact-subject">Subject</label>
+              <select id="contact-subject" name="subject">
+                <option value="">What is this about?</option>
+                <option value="volunteer">Volunteering</option>
+                <option value="donation">Donations</option>
+                <option value="assistance">Request Assistance</option>
+                <option value="church-group">Church Group Deployment</option>
+                <option value="partnership">Partnership Inquiry</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="contact-message">Message *</label>
+              <textarea id="contact-message" name="message" rows="5" required></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary btn-full">Send Message</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-about">
+          <div class="footer-logo">
+            <span class="logo-dare">D.A.R.E.</span>
+            <span class="logo-sub">Ministries</span>
+          </div>
+          <p>Disaster Aid Recovery and Effort</p>
+          <p class="footer-tagline">"{{ site.scripture }}"</p>
+        </div>
+        <div class="footer-links">
+          <h4>Quick Links</h4>
+          <ul>
+            <li><a href="#about">Our Mission</a></li>
+            <li><a href="#projects">Current Projects</a></li>
+            <li><a href="#volunteer">Volunteer</a></li>
+            <li><a href="#donate">Donate</a></li>
+            <li><a href="#contact">Contact</a></li>
+          </ul>
+        </div>
+        <div class="footer-contact">
+          <h4>Contact</h4>
+          <p>{{ site.contact.name }}</p>
+          <p><a href="mailto:{{ site.contact.email }}">{{ site.contact.email }}</a></p>
+          <p><a href="tel:+17063402221">{{ site.contact.phone }}</a></p>
+        </div>
+        <div class="footer-partners">
+          <h4>Partners</h4>
+          {% for partner in site.partners %}
+          <p>{{ partner }}</p>
+          {% endfor %}
+          <p class="footer-affiliation">{{ site.affiliation }}</p>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>&copy; {{ "now" | date("YYYY") }} D.A.R.E. Ministries &mdash; Disaster Aid Recovery and Effort. All rights reserved.</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="/js/main.js"></script>
+  <script>
+    if (window.netlifyIdentity) {
+      window.netlifyIdentity.on("init", function(user) {
+        if (!user) {
+          window.netlifyIdentity.on("login", function() {
+            document.location.href = "/admin/";
+          });
+        }
+      });
+    }
+  </script>
+</body>
+</html>

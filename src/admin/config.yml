@@ -1,0 +1,124 @@
+backend:
+  name: git-gateway
+  branch: master
+
+media_folder: "src/images/uploads"
+public_folder: "/images/uploads"
+
+collections:
+  # --- Site Settings ---
+  - name: "settings"
+    label: "Site Settings"
+    editor:
+      preview: false
+    files:
+      - name: "general"
+        label: "General Settings"
+        file: "src/_data/site.json"
+        fields:
+          - { name: "title", label: "Site Title", widget: "string" }
+          - { name: "tagline", label: "Hero Tagline", widget: "string" }
+          - { name: "subtitle", label: "Hero Subtitle", widget: "string" }
+          - { name: "description", label: "Site Description", widget: "text" }
+          - { name: "scripture", label: "Guiding Scripture/Motto", widget: "string" }
+          - name: "contact"
+            label: "Contact Information"
+            widget: "object"
+            fields:
+              - { name: "name", label: "Contact Name", widget: "string" }
+              - { name: "title", label: "Contact Title", widget: "string" }
+              - { name: "email", label: "Email", widget: "string" }
+              - { name: "phone", label: "Phone", widget: "string" }
+          - { name: "affiliation", label: "Affiliation Text", widget: "string" }
+          - name: "partners"
+            label: "Partners"
+            widget: "list"
+            field: { name: "partner", label: "Partner Name", widget: "string" }
+          - name: "about"
+            label: "About Section"
+            widget: "object"
+            fields:
+              - { name: "heading", label: "About Heading", widget: "string" }
+              - name: "paragraphs"
+                label: "About Paragraphs"
+                widget: "list"
+                field: { name: "paragraph", label: "Paragraph", widget: "text" }
+          - name: "services"
+            label: "Services"
+            widget: "list"
+            fields:
+              - { name: "title", label: "Service Title", widget: "string" }
+              - { name: "description", label: "Service Description", widget: "text" }
+              - name: "icon"
+                label: "Icon"
+                widget: "select"
+                options:
+                  - { label: "Home", value: "home" }
+                  - { label: "Tool", value: "tool" }
+                  - { label: "Truck", value: "truck" }
+                  - { label: "People", value: "people" }
+          - name: "donate"
+            label: "Donate Section"
+            widget: "object"
+            fields:
+              - { name: "heading", label: "Heading", widget: "string" }
+              - { name: "description", label: "Description", widget: "text" }
+              - { name: "note", label: "Note Text", widget: "text" }
+              - { name: "url", label: "Donation URL (leave empty if not set up)", widget: "string", required: false }
+
+  # --- Projects ---
+  - name: "projects"
+    label: "Projects"
+    file: "src/_data/projects.json"
+    editor:
+      preview: false
+    fields:
+      - name: "items"
+        label: "Projects"
+        label_singular: "Project"
+        widget: "list"
+        fields:
+          - { name: "title", label: "Project Title", widget: "string" }
+          - { name: "location", label: "Location", widget: "string" }
+          - { name: "description", label: "Description", widget: "text" }
+          - name: "status"
+            label: "Status"
+            widget: "select"
+            options:
+              - { label: "Active", value: "active" }
+              - { label: "Planning", value: "planning" }
+              - { label: "Completed", value: "completed" }
+          - { name: "accepting_volunteers", label: "Accepting Volunteers?", widget: "boolean", default: true }
+
+  # --- Gallery ---
+  - name: "gallery"
+    label: "Photo Gallery"
+    file: "src/_data/gallery.json"
+    editor:
+      preview: false
+    fields:
+      - name: "items"
+        label: "Gallery Photos"
+        label_singular: "Photo"
+        widget: "list"
+        fields:
+          - { name: "image", label: "Photo", widget: "image", required: false }
+          - { name: "caption", label: "Caption", widget: "string" }
+          - { name: "alt", label: "Alt Text (accessibility)", widget: "string" }
+
+  # --- Blog Posts ---
+  - name: "posts"
+    label: "Updates / Blog"
+    label_singular: "Post"
+    folder: "src/content/posts"
+    create: true
+    slug: "{{year}}-{{month}}-{{day}}-{{slug}}"
+    editor:
+      preview: true
+    fields:
+      - { name: "title", label: "Title", widget: "string" }
+      - { name: "date", label: "Date", widget: "datetime" }
+      - { name: "summary", label: "Summary (1-2 sentences)", widget: "text", required: false }
+      - { name: "image", label: "Featured Image", widget: "image", required: false }
+      - { name: "tags", label: "Tags", widget: "list", required: false }
+      - { name: "body", label: "Body", widget: "markdown" }

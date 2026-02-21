@@ -1,0 +1,55 @@
+{
+  "title": "D.A.R.E. Ministries",
+  "tagline": "We Fix the Roof.",
+  "subtitle": "And we stay until the job is done.",
+  "description": "D.A.R.E. Ministries provides long-term disaster recovery for our neighbors in Georgia — long after the news cameras leave.",
+  "scripture": "We will always be there to fix the roof.",
+  "contact": {
+    "name": "Leonard Scarboro",
+    "title": "Director",
+    "email": "whofixedtheroof@gmail.com",
+    "phone": "(706) 340-2221"
+  },
+  "affiliation": "A United Methodist ministry",
+  "partners": [
+    "Roswell United Methodist Church",
+    "Habitat for Humanity"
+  ],
+  "about": {
+    "heading": "Disaster Aid Recovery and Effort",
+    "paragraphs": [
+      "When disaster strikes, the world watches. News crews arrive, donations pour in, and volunteers fill the streets. But within weeks, the cameras leave. The donations slow. And our neighbors are left standing in the wreckage of their homes, wondering if anyone still cares.",
+      "<strong>We care. And we stay.</strong>",
+      "D.A.R.E. Ministries is a faith-based coalition of volunteers committed to <em>long-term</em> disaster recovery in Georgia. Connected to the United Methodist tradition, we bring together church groups, community organizations, and individuals who believe that rebuilding a life takes more than a weekend.",
+      "From Augusta to Valdosta, we deploy multi-day teams to do the essential work: repairing roofs, demolishing damaged structures, installing fencing, soffit, fascia, and whatever else our neighbors need to come home again."
+    ]
+  },
+  "services": [
+    {
+      "title": "Home Repairs",
+      "description": "Roof repair, structural fixes, drywall, flooring, and the essential work that makes a house a home again after disaster.",
+      "icon": "home"
+    },
+    {
+      "title": "Demolition & Cleanup",
+      "description": "Removing damaged materials, clearing debris, and preparing sites for reconstruction so families can begin to rebuild.",
+      "icon": "tool"
+    },
+    {
+      "title": "Multi-Day Deployments",
+      "description": "We organize teams for extended trips to disaster areas, providing overnight lodging and meals so volunteers can focus on the work.",
+      "icon": "truck"
+    },
+    {
+      "title": "Community Partnerships",
+      "description": "We partner with churches, Habitat for Humanity, and community groups to multiply our impact across Georgia.",
+      "icon": "people"
+    }
+  ],
+  "donate": {
+    "heading": "Support the Mission",
+    "description": "Your financial support helps us purchase building materials, cover transportation costs, and provide meals and lodging for our volunteer teams. Every dollar goes directly toward rebuilding homes and restoring hope for disaster-affected families in Georgia.",
+    "note": "Donation platform coming soon. For now, please contact us to discuss giving options.",
+    "url": ""
+  }
+}

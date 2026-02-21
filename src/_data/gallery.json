@@ -1,0 +1,34 @@
+{
+  "items": [
+    {
+      "image": "",
+      "caption": "Volunteer teams on site",
+      "alt": "DARE volunteer teams working on site"
+    },
+    {
+      "image": "",
+      "caption": "Roof repair in progress",
+      "alt": "Volunteers repairing a roof"
+    },
+    {
+      "image": "",
+      "caption": "Community partnership event",
+      "alt": "Community partners gathering for disaster relief"
+    },
+    {
+      "image": "",
+      "caption": "Completed home restoration",
+      "alt": "A completed home restoration project"
+    },
+    {
+      "image": "",
+      "caption": "Team deployment preparation",
+      "alt": "Team preparing for a deployment"
+    },
+    {
+      "image": "",
+      "caption": "Homeowner celebration",
+      "alt": "Celebrating with a homeowner after project completion"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "items": [
+    {
+      "title": "Augusta Recovery Operations",
+      "location": "Augusta, Georgia",
+      "description": "Ongoing home repair and rebuilding efforts for families impacted by severe storm damage. Our teams are working on roofing, structural repairs, and exterior restoration.",
+      "status": "active",
+      "accepting_volunteers": true
+    },
+    {
+      "title": "Valdosta Disaster Response",
+      "location": "Valdosta, Georgia",
+      "description": "Multi-phase recovery including demolition of unsafe structures, debris removal, fencing installation, and home weatherization for affected homeowners.",
+      "status": "active",
+      "accepting_volunteers": true
+    }
+  ]
+}
