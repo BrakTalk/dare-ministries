@@ -197,4 +197,72 @@ Phase 3 — Polish & grow (ongoing)
   ├── Newsletter signup
   ├── Social media links/feed
   └── SEO & Open Graph tags
+
+Phase 4 — Hosting migration (when ready)
+  ├── Gather hosting & domain intel from Roswell UMC IT (see questions below)
+  ├── Decide on deployment method (FTP upload vs. GitHub Actions pipeline)
+  ├── Configure Supabase credentials in new environment
+  ├── Set up SSL certificate on new host
+  ├── DNS cutover (low-TTL window)
+  └── Decommission Netlify site
 ```
+
+---
+
+## 🏠 Phase 4 — Hosting Migration to Roswell UMC
+
+### Overview
+
+The site currently lives on **Netlify** (dare-ministries.netlify.app) which is a solid free-tier solution for development and early launch. Eventually DARE may want to migrate to Roswell UMC's existing hosting infrastructure for organizational consolidation, cost management, or domain alignment (e.g. `dare.ruwmc.org`).
+
+The good news: because this is a **static site** (just HTML, CSS, and JS files), the migration is far simpler than moving a database-driven site like WordPress. The Supabase database stays exactly where it is — only the file hosting changes.
+
+---
+
+### ❓ Questions for Roswell UMC Domain & Hosting Owners
+
+#### Domain Questions
+
+1. **Who is the domain registrar?** (e.g., GoDaddy, Namecheap, Google Domains, Network Solutions) — this is where DNS records are managed
+2. **Who has login access to the domain registrar account?** Name and contact info of the person who can make DNS changes
+3. **What domain should DARE use?** Options to discuss:
+   - A standalone domain: `dare-ministries.org` or `whofixedtheroof.org`
+   - A subdomain of RUMC: `dare.ruwmc.org` or `recovery.ruwmc.org`
+   - Keep `dare-ministries.netlify.app` permanently (free, no migration needed)
+4. **Is the intended domain already registered?** If not, who will register it and pay the annual fee (~$12–15/year)?
+5. **What is the current DNS TTL setting?** (Time-to-live — lower is better during cutover to minimize downtime)
+
+#### Hosting Questions
+
+6. **Who hosts the Roswell UMC website?** Company name and any account contacts
+7. **What type of hosting is it?** e.g.:
+   - Shared hosting with cPanel (GoDaddy, Bluehost, SiteGround)
+   - Managed WordPress (WP Engine, Flywheel)
+   - Church management platform (Squarespace, Wix, Ministry Brands)
+   - VPS or dedicated server
+8. **Is there FTP or SFTP access to upload files?** Credentials or the ability to create them?
+9. **Can a subdirectory or subdomain be created for DARE?** e.g., a `/dare/` folder or `dare.ruwmc.org`
+10. **How much disk space is available?** (The DARE site is under 5MB — rarely a concern)
+11. **Does the hosting support SSL/HTTPS?** Is there a free Let's Encrypt certificate, or is a paid cert required?
+
+#### Technical & Process Questions
+
+12. **Is there a staging environment?** Somewhere to test before going live?
+13. **Who is the IT contact at RUMC?** Name, email, and phone for the person who manages the website
+14. **What is the approval process for DNS changes?** Some churches require committee or staff approval
+15. **Are there any content policies or restrictions?** Brand guidelines, approval workflows for new pages, etc.
+16. **Does RUMC use a CDN?** (e.g., Cloudflare) If so, this simplifies the migration significantly
+17. **Is there an existing deployment pipeline?** Or is the site updated manually via FTP?
+
+---
+
+### ⚠️ Key Migration Considerations
+
+| Concern                    | Notes                                                                                                                                                                                |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Supabase stays put**     | The database is hosted by Supabase independently — it doesn't move. Only the HTML/CSS/JS files migrate.                                                                              |
+| **Credentials / env vars** | The Supabase anon key is a public key by design. If the new host has no build pipeline, we bake it directly into the JS — no security risk.                                          |
+| **Build pipeline**         | Netlify currently runs `npx @11ty/eleventy` on every GitHub push. If RUMC uses simple FTP hosting, we switch to a GitHub Actions workflow that builds and FTP-deploys automatically. |
+| **SSL is non-negotiable**  | The Supabase JS client requires HTTPS. The site will not function on plain HTTP. Confirm SSL is available before migrating.                                                          |
+| **Zero-downtime cutover**  | Lower DNS TTL to 5 minutes 24 hours before cutover. Upload files to new host. Switch DNS. Keep Netlify live for 24–48 hours as a fallback.                                           |
+| **No rush**                | There is no cost to keeping Netlify as-is indefinitely. Migration is only worth doing if RUMC hosting is preferred for organizational reasons.                                       |
