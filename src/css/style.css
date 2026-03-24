@@ -254,6 +254,13 @@ h4 {
   max-width: 800px;
 }
 
+.hero-image {
+  max-width: 300px;
+  margin: 0 auto 24px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
+
 .hero h1 {
   font-size: 4rem;
   color: var(--color-white);
