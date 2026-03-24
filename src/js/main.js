@@ -1,7 +1,6 @@
 // D.A.R.E. Ministries — Main JavaScript
 
 document.addEventListener('DOMContentLoaded', function () {
-
   // --- Mobile Navigation Toggle ---
   const navToggle = document.getElementById('navToggle');
   const navLinks = document.getElementById('navLinks');
@@ -49,55 +48,22 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   });
 
-  // --- Form submission handling (Netlify Forms) ---
-  var forms = document.querySelectorAll('form[data-netlify="true"]');
-  forms.forEach(function (form) {
-    form.addEventListener('submit', function (e) {
-      e.preventDefault();
-
-      var formData = new FormData(form);
-      var formName = form.getAttribute('name');
-
-      fetch('/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams(formData).toString()
-      })
-      .then(function (response) {
-        if (response.ok) {
-          var container = form.parentElement;
-          var successMsg = formName === 'volunteer'
-            ? 'Thank you for signing up! We\'ll be in touch soon about upcoming deployments.'
-            : 'Thank you for your message! We\'ll get back to you shortly.';
-
-          container.innerHTML =
-            '<div class="form-success">' +
-              '<h4>Message Sent!</h4>' +
-              '<p>' + successMsg + '</p>' +
-            '</div>';
-        } else {
-          alert('There was an issue submitting the form. Please try again or contact us directly at whofixedtheroof@gmail.com');
-        }
-      })
-      .catch(function () {
-        alert('There was an issue submitting the form. Please try again or contact us directly at whofixedtheroof@gmail.com');
-      });
-    });
-  });
-
   // --- Intersection Observer for fade-in animations ---
   if ('IntersectionObserver' in window) {
-    var observer = new IntersectionObserver(function (entries) {
-      entries.forEach(function (entry) {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('fade-in');
-          observer.unobserve(entry.target);
-        }
-      });
-    }, {
-      threshold: 0.1,
-      rootMargin: '0px 0px -50px 0px'
-    });
+    var observer = new IntersectionObserver(
+      function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('fade-in');
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      {
+        threshold: 0.1,
+        rootMargin: '0px 0px -50px 0px',
+      }
+    );
 
     document.querySelectorAll('.service-card, .project-card, .stat').forEach(function (el) {
       observer.observe(el);

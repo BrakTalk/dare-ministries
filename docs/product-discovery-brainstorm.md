@@ -31,13 +31,13 @@
 
 ### 🧭 Product Manager — Business Value & Strategic Alignment
 
-| #   | Idea                                | Description                                                                                                                                                                                                                              |
-| --- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| PM1 | **Volunteer Pipeline (Form → CRM)** | Replace the dead-end form with a working pipeline: Netlify Forms captures submissions, Zapier/Make routes them into Airtable or Google Sheets — giving Leonard an actual volunteer roster to manage. Zero backend infrastructure needed. |
-| PM2 | **Real-Time Impact Counter**        | A stats bar (or section) showing live/updated numbers: homes repaired, volunteer hours served, deployments completed, families helped. Builds donor confidence and validates the mission at a glance.                                    |
-| PM3 | **Deployment Calendar**             | A public-facing calendar of upcoming deployments so volunteers can browse and sign up for specific dates — turning vague interest into concrete commitment.                                                                              |
-| PM4 | **Monthly Prayer/Update Email**     | A simple newsletter signup (Mailchimp free tier) that keeps donors and prayer supporters engaged between deployments — critical for long-term donor retention.                                                                           |
-| PM5 | **Partner Church Registration**     | A lightweight form for churches/groups to register as DARE partners, formalizing the 30+ partner org relationships and creating a pipeline for new organizational volunteers.                                                            |
+| #   | Idea                                     | Description                                                                                                                                                                                                                                                            |
+| --- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PM1 | **Volunteer Pipeline (Form → Database)** | Replace the dead-end form with a working pipeline backed by Supabase (PostgreSQL). Form submissions are stored in a `volunteers` table; Leonard manages the roster via Supabase Studio. Scales to support deployments, partner orgs, and impact tracking in one place. |
+| PM2 | **Real-Time Impact Counter**             | A stats bar (or section) showing live/updated numbers: homes repaired, volunteer hours served, deployments completed, families helped. Builds donor confidence and validates the mission at a glance.                                                                  |
+| PM3 | **Deployment Calendar**                  | A public-facing calendar of upcoming deployments so volunteers can browse and sign up for specific dates — turning vague interest into concrete commitment.                                                                                                            |
+| PM4 | **Monthly Prayer/Update Email**          | A simple newsletter signup (Mailchimp free tier) that keeps donors and prayer supporters engaged between deployments — critical for long-term donor retention.                                                                                                         |
+| PM5 | **Partner Church Registration**          | A lightweight form for churches/groups to register as DARE partners, formalizing the 30+ partner org relationships and creating a pipeline for new organizational volunteers.                                                                                          |
 
 ---
 
@@ -55,31 +55,33 @@
 
 ### ⚙️ Software Engineer — Technical Possibilities & Scalable Solutions
 
-| #   | Idea                                    | Description                                                                                                                                                                                 |
-| --- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| E1  | **Netlify Forms + Airtable via Zapier** | Netlify already handles the form POST — just add a Zapier webhook to pipe submissions into Airtable (free tier). Leonard gets a spreadsheet-style volunteer roster with zero server cost.   |
-| E2  | **Givelify or PayPal.me Donation Link** | DARE's denomination (UMC) has Givelify built in — it may already exist. Otherwise, a PayPal.me or Venmo link is instant to set up, costs nothing, and gets the Donate button working today. |
-| E3  | **Sveltia CMS Editorial Workflow**      | Fully enable the CMS so Leonard (or a volunteer admin) can post deployment updates, add/remove projects, and upload gallery photos without touching code. The config is already 80% there.  |
-| E4  | **Cloudinary Free Tier for Gallery**    | Use Cloudinary's free image CDN for uploads and auto-cropping. Enables a much richer gallery with consistent thumbnails, lazy loading, and lightbox without bloating the repo.              |
-| E5  | **Social Media Feed Embed**             | If DARE has a Facebook or Instagram presence, embed a live feed widget (Elfsight free tier or similar) so the site stays fresh without manual CMS updates.                                  |
+| #   | Idea                                          | Description                                                                                                                                                                                                                                                                             |
+| --- | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| E1  | **Supabase PostgreSQL Backend** ✅ _Selected_ | A managed PostgreSQL database (Supabase free tier) replaces the Netlify Forms → Zapier → Airtable chain. Single source of truth for volunteers, contacts, deployments, and impact stats. Row Level Security locks down all tables by default. Leonard manages data via Supabase Studio. |
+| E2  | **Givelify or PayPal.me Donation Link**       | DARE's denomination (UMC) has Givelify built in — it may already exist. Otherwise, a PayPal.me or Venmo link is instant to set up, costs nothing, and gets the Donate button working today.                                                                                             |
+| E3  | **Sveltia CMS Editorial Workflow**            | Fully enable the CMS so Leonard (or a volunteer admin) can post deployment updates, add/remove projects, and upload gallery photos without touching code. The config is already 80% there.                                                                                              |
+| E4  | **Cloudinary Free Tier for Gallery**          | Use Cloudinary's free image CDN for uploads and auto-cropping. Enables a much richer gallery with consistent thumbnails, lazy loading, and lightbox without bloating the repo.                                                                                                          |
+| E5  | **Social Media Feed Embed**                   | If DARE has a Facebook or Instagram presence, embed a live feed widget (Elfsight free tier or similar) so the site stays fresh without manual CMS updates.                                                                                                                              |
 
 ---
 
 ## 🏆 Top 5 Prioritized Ideas
 
-### 1. 🥇 Volunteer Form → Airtable Pipeline _(E1 + PM1)_
+### 1. 🥇 Volunteer Form → Supabase Database _(E1 + PM1)_ ✅ _In Progress_
 
 **"Make the signup form actually work"**
 
-> Connect Netlify Forms to Airtable via Zapier so every volunteer submission lands in a managed roster Leonard can act on.
+> Connect the volunteer form directly to a Supabase PostgreSQL database. Submissions land in a `volunteers` table; Leonard manages the roster via Supabase Studio (no technical knowledge needed).
 
-**Why #1:** The form is the primary conversion goal of the site. Right now it collects nothing. This is high-impact, low-cost, and requires no backend code.
+**Why #1:** The form is the primary conversion goal of the site. Right now it collects nothing. Supabase replaces the fragile Netlify Forms → Zapier → Airtable chain with a single, scalable backend that also powers the impact counter, contact form, and future features.
+
+**Decision:** Supabase chosen over Netlify Forms + Zapier + Airtable — eliminates three free-tier limits, zero server maintenance, and positions DARE for future growth (deployments calendar, partner portal, etc.).
 
 **Key assumptions to validate:**
 
-- Leonard is willing to manage a spreadsheet/Airtable board
-- Netlify Forms free tier (100 submissions/month) is sufficient
-- Zapier free tier (100 tasks/month) covers the volume
+- Leonard is comfortable managing data in Supabase Studio
+- Supabase free tier (500MB, unlimited API requests) is sufficient for current volume
+- Row Level Security policies adequately protect volunteer data
 
 ---
 
@@ -126,7 +128,7 @@
 **Key assumptions to validate:**
 
 - Leonard has access to historical deployment/impact data
-- Numbers can be maintained in `site.json` via the CMS
+- Numbers can be maintained in the Supabase `impact_stats` table and updated via Supabase Studio
 - Approximate figures are acceptable where exact data isn't available
 
 ---
@@ -166,19 +168,31 @@
 
 ---
 
+## 🏛️ Architecture Decisions
+
+| Decision                        | Options Considered                                                    | Choice       | Rationale                                                                                                                                                                           |
+| ------------------------------- | --------------------------------------------------------------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Form backend & data storage** | Netlify Forms + Zapier + Airtable / Self-hosted PostgreSQL / Supabase | **Supabase** | Managed PostgreSQL with zero server maintenance, generous free tier, built-in admin UI (Supabase Studio), Row Level Security, and Realtime — replaces three separate tools with one |
+| **Self-hosted vs. managed DB**  | Self-hosted PostgreSQL (DigitalOcean/AWS) / Supabase                  | **Supabase** | No developer needed for maintenance; Leonard can manage data without technical knowledge; scales gracefully; open source and self-hostable if needs change                          |
+
+---
+
 ## 🗺️ Recommended Sequencing
 
 ```
 Phase 1 — Make it functional (this week)
-  ├── Volunteer form → Airtable pipeline
+  ├── ✅ Supabase project created (PostgreSQL backend)
+  ├── Volunteer form → Supabase (volunteers table)
+  ├── Contact form → Supabase (contacts table)
   └── Donation button → Givelify/PayPal
 
 Phase 2 — Build trust (next 2–4 weeks)
-  ├── Impact stats section
+  ├── Live impact counter (impact_stats table via Supabase Realtime)
   ├── Before/after gallery redesign
   └── "How It Works" volunteer journey
 
 Phase 3 — Polish & grow (ongoing)
+  ├── Deployment calendar (deployments table)
   ├── Testimonials section
   ├── Newsletter signup
   ├── Social media links/feed

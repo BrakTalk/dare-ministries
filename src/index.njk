@@ -272,9 +272,7 @@ layout: false
           </div>
         </div>
         <div class="volunteer-form-container">
-          <form class="volunteer-form" id="volunteerForm" name="volunteer" method="POST" data-netlify="true" netlify-honeypot="bot-field">
-            <input type="hidden" name="form-name" value="volunteer">
-            <p style="display:none"><label>Don't fill this out: <input name="bot-field"></label></p>
+          <form class="volunteer-form" id="volunteerForm">
             <h4>Volunteer Interest Form</h4>
             <div class="form-group">
               <label for="name">Full Name *</label>
@@ -376,8 +374,7 @@ layout: false
           </div>
         </div>
         <div class="contact-form-container">
-          <form class="contact-form" name="contact" method="POST" data-netlify="true" netlify-honeypot="bot-field">
-            <input type="hidden" name="form-name" value="contact">
+          <form class="contact-form">
             <p style="display:none"><label>Don't fill this out: <input name="bot-field"></label></p>
             <h4>Send Us a Message</h4>
             <div class="form-group">
@@ -454,5 +451,10 @@ layout: false
   </footer>
 
   <script src="/js/main.js"></script>
+  <script>
+    window.__SUPABASE_URL__ = "{{ env.supabaseUrl }}";
+    window.__SUPABASE_KEY__ = "{{ env.supabaseAnonKey }}";
+  </script>
+  <script type="module" src="/js/supabase.js"></script>
 </body>
 </html>
