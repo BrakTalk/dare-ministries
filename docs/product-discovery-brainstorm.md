@@ -199,6 +199,9 @@ Phase 3 — Polish & grow (ongoing)
   └── SEO & Open Graph tags
 
 Phase 4 — Roster management portal (see full spec below)
+  ├── Obtain Leo's existing volunteer spreadsheet
+  ├── Audit & normalize columns to match Supabase schema
+  ├── Import spreadsheet data into volunteers table (CSV or SQL)
   ├── Supabase Auth — secure login for Leonard (and future admins)
   ├── Protected /roster page — not accessible without login
   ├── Volunteer roster table — sortable, filterable, searchable
@@ -348,6 +351,44 @@ Authentication will be handled by **Supabase Auth** — the same platform alread
 - Supabase Auth JS client handles login/session on the client side
 - RLS policies updated to allow authenticated users (not just anon) to SELECT from volunteers and contacts tables
 - No server-side code required — fully client-side auth via Supabase JS SDK
+
+---
+
+### 📥 Spreadsheet Import
+
+Leonard has an existing volunteer roster in spreadsheet form. This data should be imported into the `volunteers` table before the roster portal goes live so he starts with a complete, unified record — not a split between "old" (spreadsheet) and "new" (website signups).
+
+#### Import Process
+
+| Step           | Action                                                                                              |
+| -------------- | --------------------------------------------------------------------------------------------------- |
+| 1. Obtain      | Leo shares his spreadsheet (Excel or Google Sheets)                                                 |
+| 2. Audit       | Review columns — identify what maps to our schema and what doesn't                                  |
+| 3. Normalize   | Clean up inconsistent formatting (phone numbers, availability values, etc.)                         |
+| 4. Map columns | Match Leo's headers to: `name`, `email`, `phone`, `organization`, `skills`, `availability`, `notes` |
+| 5. Import      | Use Supabase's CSV importer (Table Editor → Import data) or a bulk SQL INSERT                       |
+| 6. Verify      | Spot-check records in Supabase Studio; confirm row count matches source                             |
+
+#### Column Mapping (to confirm with Leo)
+
+| Leo's spreadsheet column | Maps to in Supabase | Notes                                                 |
+| ------------------------ | ------------------- | ----------------------------------------------------- |
+| Name / Full Name         | `name`              |                                                       |
+| Email                    | `email`             |                                                       |
+| Phone / Cell             | `phone`             | Normalize to consistent format                        |
+| Church / Organization    | `organization`      |                                                       |
+| Skills                   | `skills`            | Free text — import as-is                              |
+| Availability             | `availability`      | May need standardizing to match dropdown values       |
+| Notes / Comments         | `notes`             |                                                       |
+| Any other columns        | TBD                 | Flag for review — may need new fields added to schema |
+
+#### Questions to Answer Before Import
+
+1. **What format is the spreadsheet in?** Excel (.xlsx), Google Sheets, or CSV?
+2. **What columns does Leo have?** Share a sample row (with real data redacted if needed)
+3. **How many rows?** Helps estimate import time and spot any data quality issues
+4. **Are there any sensitive columns** beyond name/email/phone? (e.g., home addresses, medical conditions, emergency contacts) — these may need a privacy review before storing in the database
+5. **Are any volunteers "inactive" or historical?** We can add a `status` field value of `Inactive` to archive them without deleting
 
 ---
 
