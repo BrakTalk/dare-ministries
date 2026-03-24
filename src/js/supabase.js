@@ -76,37 +76,67 @@ if (contactForm) {
 }
 
 // ─── Impact Counter ───────────────────────────────────────────────────────────
+// Strategy: fetch data eagerly on load, animate only when BOTH the data is
+// ready AND the section is in the viewport. This fixes the race condition where
+// navigating directly to #impact causes the animation to fire before the fetch
+// completes, resulting in all zeros.
 
-async function loadImpactStats() {
-  const els = {
-    homes: document.getElementById('stat-homes'),
-    families: document.getElementById('stat-families'),
-    deployments: document.getElementById('stat-deployments'),
-    hours: document.getElementById('stat-hours'),
-    partners: document.getElementById('stat-partners'),
-    years: document.getElementById('stat-years'),
-    updated: document.getElementById('impact-updated'),
-  };
+let _impactData = null; // populated by fetch
+let _sectionVisible = false; // set true by IntersectionObserver
+let _animated = false; // guard — only animate once
 
-  if (!els.homes) return; // section not on page
+const impactSection = document.getElementById('impact');
 
-  const { data, error } = await supabase.from('impact_stats').select('*').eq('id', 1).single();
+if (impactSection) {
+  // 1. Fetch data immediately — don't wait for scroll
+  (async () => {
+    const { data, error } = await supabase.from('impact_stats').select('*').eq('id', 1).single();
 
-  if (error || !data) {
-    console.error('Impact stats error:', error);
-    return;
-  }
+    if (error || !data) {
+      console.error('Impact stats error:', error);
+      return;
+    }
 
-  // Animate each number counting up
-  animateCount(els.homes, data.homes_repaired);
-  animateCount(els.families, data.families_helped);
-  animateCount(els.deployments, data.deployments_completed);
-  animateCount(els.hours, data.volunteer_hours, true);
-  animateCount(els.partners, data.partner_organizations);
-  animateCount(els.years, data.years_of_service);
+    _impactData = data;
 
-  if (els.updated && data.updated_at) {
-    els.updated.textContent = new Date(data.updated_at).toLocaleDateString('en-US', {
+    // If the section is already visible (e.g. user navigated via #impact),
+    // animate immediately now that we have the data.
+    if (_sectionVisible) renderImpactStats();
+  })();
+
+  // 2. Watch for the section entering the viewport
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          _sectionVisible = true;
+          // If data already arrived, animate now; otherwise the fetch
+          // callback above will trigger renderImpactStats() when it lands.
+          if (_impactData) renderImpactStats();
+          observer.unobserve(entry.target);
+        }
+      });
+    },
+    { threshold: 0.05 } // fire as soon as section barely enters viewport
+  );
+  observer.observe(impactSection);
+}
+
+function renderImpactStats() {
+  if (_animated || !_impactData) return;
+  _animated = true;
+
+  const data = _impactData;
+  animateCount(document.getElementById('stat-homes'), data.homes_repaired);
+  animateCount(document.getElementById('stat-families'), data.families_helped);
+  animateCount(document.getElementById('stat-deployments'), data.deployments_completed);
+  animateCount(document.getElementById('stat-hours'), data.volunteer_hours, true);
+  animateCount(document.getElementById('stat-partners'), data.partner_organizations);
+  animateCount(document.getElementById('stat-years'), data.years_of_service);
+
+  const updatedEl = document.getElementById('impact-updated');
+  if (updatedEl && data.updated_at) {
+    updatedEl.textContent = new Date(data.updated_at).toLocaleDateString('en-US', {
       month: 'long',
       year: 'numeric',
     });
@@ -114,13 +144,13 @@ async function loadImpactStats() {
 }
 
 function animateCount(el, target, useComma = false) {
-  if (!el || target === 0) {
+  if (!el || !target) {
     if (el) el.textContent = '—';
     return;
   }
 
   const duration = 1800;
-  const steps = 50;
+  const steps = 60;
   const interval = duration / steps;
   let current = 0;
 
@@ -133,23 +163,6 @@ function animateCount(el, target, useComma = false) {
     const value = Math.floor(current);
     el.textContent = useComma ? value.toLocaleString() + '+' : value + '+';
   }, interval);
-}
-
-// Trigger stats load when section scrolls into view
-const impactSection = document.getElementById('impact');
-if (impactSection) {
-  const observer = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          loadImpactStats();
-          observer.unobserve(entry.target);
-        }
-      });
-    },
-    { threshold: 0.2 }
-  );
-  observer.observe(impactSection);
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
