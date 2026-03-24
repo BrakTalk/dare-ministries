@@ -11,10 +11,7 @@
     "phone": "(706) 340-2221"
   },
   "affiliation": "A United Methodist ministry",
-  "partners": [
-    "Roswell United Methodist Church",
-    "Habitat for Humanity"
-  ],
+  "partners": ["Roswell United Methodist Church", "Habitat for Humanity"],
   "about": {
     "heading": "Disaster Aid Recovery and Effort",
     "paragraphs": [
@@ -46,6 +43,38 @@
       "icon": "people"
     }
   ],
+  "history": {
+    "heading": "Our Story",
+    "subtitle": "How D.A.R.E. Ministries came to be",
+    "milestones": [
+      {
+        "year": "2004",
+        "title": "The Spark",
+        "body": "When a tornado tore through North Carolina, Mike Carmichael and Harold Dodson led a group of men from Roswell UMC to assist — equipped with nothing but personal tools and chainsaws. Inspired by their grit, Rick Page purchased an equipment trailer and — along with Richard Lowenthal, Rusty Gordon, and others — filled it with tools and supplies. The Disaster Assistance and Recovery Effort was born. Roswell UMC would be ready."
+      },
+      {
+        "year": "2005",
+        "title": "Hurricane Katrina",
+        "body": "When Hurricane Katrina struck the Gulf Coast, DARE was among the first to deploy to Louisiana and Mississippi. Over the next several years, DARE made over 30 recovery trips, with the Bereans and CUC classes leading the way. With the volume of volunteers joining teams, the DARE equipment trailer was stationed on site in Mississippi for the duration of the recovery effort."
+      },
+      {
+        "year": "2018",
+        "title": "Hurricane Michael",
+        "body": "When Hurricane Michael — the first Category 5 storm to hit the US mainland since 1992 — struck Florida, DARE leadership passed to Leonard Scarboro. Roswell UMC formed teams to respond, and over 24 teams deployed to the Panama City, FL area to assist in the long recovery ahead."
+      },
+      {
+        "year": "2020s",
+        "title": "Growing Beyond Roswell",
+        "body": "As deployments continued through and after the COVID lockdown, a new challenge emerged: finding enough volunteers. It was decided that DARE could no longer be limited to Roswell UMC. Leonard began recruiting other churches and groups to join the effort. In 2024, DARE received an award for dedication and leadership in Long-Term Recovery from Bishop Dease at the North Georgia UMC Annual Conference."
+      },
+      {
+        "year": "Today",
+        "title": "The Promise Continues",
+        "body": "DARE deploys teams from Roswell UMC and over 30 partner organizations every month. Recovery efforts take 18–24 months, and DARE has made a promise to stay as long as needed. Inspired by Luke 5:17–26, our volunteers carry one question with them: Who fixed the roof?"
+      }
+    ],
+    "closing": "Thanks to Rick Page and to our thousands of volunteers — when asked \"Who fixed the roof?\" — we answer: I DID!"
+  },
   "donate": {
     "heading": "Support the Mission",
     "description": "Your financial support helps us purchase building materials, cover transportation costs, and provide meals and lodging for our volunteer teams. Every dollar goes directly toward rebuilding homes and restoring hope for disaster-affected families in Georgia.",
