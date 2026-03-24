@@ -255,7 +255,9 @@ h4 {
 }
 
 .hero-image {
-  max-width: 300px;
+  max-width: 860px;
+  width: 100%;
+  height: auto;
   margin: 0 auto 24px;
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
