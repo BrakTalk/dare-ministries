@@ -82,8 +82,8 @@ if (contactForm) {
 // completes, resulting in all zeros.
 
 let _impactData = null; // populated by fetch
-let _sectionVisible = false; // set true by IntersectionObserver
-let _animated = false; // guard — only animate once
+let _sectionVisible = false; // tracks whether section is in viewport
+let _animating = false; // prevents overlapping animations mid-scroll
 
 const impactSection = document.getElementById('impact');
 
@@ -99,32 +99,47 @@ if (impactSection) {
 
     _impactData = data;
 
-    // If the section is already visible (e.g. user navigated via #impact),
-    // animate immediately now that we have the data.
+    // If section already visible when data arrives, animate now.
     if (_sectionVisible) renderImpactStats();
   })();
 
-  // 2. Watch for the section entering the viewport
+  // 2. Watch for section entering AND leaving the viewport
   const observer = new IntersectionObserver(
     (entries) => {
       entries.forEach((entry) => {
         if (entry.isIntersecting) {
           _sectionVisible = true;
-          // If data already arrived, animate now; otherwise the fetch
-          // callback above will trigger renderImpactStats() when it lands.
-          if (_impactData) renderImpactStats();
-          observer.unobserve(entry.target);
+          if (_impactData && !_animating) renderImpactStats();
+        } else {
+          // Section left — reset numbers so they re-animate on next visit
+          _sectionVisible = false;
+          _animating = false;
+          resetImpactStats();
         }
       });
     },
-    { threshold: 0.05 } // fire as soon as section barely enters viewport
+    { threshold: 0.05 }
   );
   observer.observe(impactSection);
 }
 
+function resetImpactStats() {
+  [
+    'stat-homes',
+    'stat-families',
+    'stat-deployments',
+    'stat-hours',
+    'stat-partners',
+    'stat-years',
+  ].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = '—';
+  });
+}
+
 function renderImpactStats() {
-  if (_animated || !_impactData) return;
-  _animated = true;
+  if (_animating || !_impactData) return;
+  _animating = true;
 
   const data = _impactData;
   animateCount(document.getElementById('stat-homes'), data.homes_repaired);
