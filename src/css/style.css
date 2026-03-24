@@ -365,6 +365,89 @@ h4 {
   font-weight: 600;
 }
 
+/* --- Impact Counter Section --- */
+.impact-counter {
+  background: var(--color-accent);
+  background: linear-gradient(135deg, var(--color-earth) 0%, var(--color-primary) 100%);
+  padding: 72px 0 56px;
+}
+
+.impact-counter .section-header h2 {
+  color: var(--color-white);
+}
+
+.impact-counter .section-divider {
+  background: var(--color-accent-light);
+}
+
+.impact-counter .section-subtitle {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.impact-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 40px 24px;
+  margin: 40px 0 32px;
+}
+
+.impact-stat {
+  text-align: center;
+  padding: 24px 16px;
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  transition: background 0.2s ease;
+}
+
+.impact-stat:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.impact-number {
+  display: block;
+  font-family: var(--font-heading);
+  font-size: 2.8rem;
+  font-weight: 900;
+  color: var(--color-accent-light);
+  line-height: 1.1;
+  margin-bottom: 8px;
+  letter-spacing: -1px;
+}
+
+.impact-label {
+  display: block;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.75);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  font-weight: 600;
+}
+
+.impact-note {
+  text-align: center;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.45);
+  font-style: italic;
+  margin-top: 8px;
+}
+
+@media (max-width: 768px) {
+  .impact-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+  }
+  .impact-number {
+    font-size: 2.2rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .impact-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 /* --- About Section --- */
 .about {
   background: var(--color-cream);

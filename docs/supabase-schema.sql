@@ -38,8 +38,9 @@ CREATE TABLE impact_stats (
   updated_at             TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Seed the single impact_stats row with initial values.
--- Update these numbers with Leonard to reflect real historical data.
+-- Seed with PLACEHOLDER/TEST data.
+-- Replace with real numbers from Leonard before public launch.
+-- To reset: run the UPDATE block in the "Reset" section below.
 INSERT INTO impact_stats (
   homes_repaired,
   volunteer_hours,
@@ -48,13 +49,26 @@ INSERT INTO impact_stats (
   families_helped,
   years_of_service
 ) VALUES (
-  0,   -- update with real number
-  0,   -- update with real number
-  0,   -- update with real number
-  30,  -- 30+ partner organizations mentioned in site content
-  0,   -- update with real number
-  21   -- founded 2004, active through 2026
+  150,   -- PLACEHOLDER — confirm with Leonard
+  8500,  -- PLACEHOLDER — confirm with Leonard
+  120,   -- PLACEHOLDER — confirm with Leonard
+  30,    -- confirmed: 30+ partner organizations
+  175,   -- PLACEHOLDER — confirm with Leonard
+  21     -- confirmed: founded 2004, active through 2026
 );
+
+-- ─── Reset to Zero (run when Leonard provides real numbers) ───────────────────
+-- Uncomment and run this block to wipe test data before entering real figures:
+--
+-- UPDATE impact_stats SET
+--   homes_repaired        = 0,
+--   volunteer_hours       = 0,
+--   deployments_completed = 0,
+--   partner_organizations = 0,
+--   families_helped       = 0,
+--   years_of_service      = 0,
+--   updated_at            = NOW()
+-- WHERE id = 1;
 
 -- ─── Row Level Security ───────────────────────────────────────────────────────
 -- Enable RLS on all tables (blocks everything by default, then we open only
