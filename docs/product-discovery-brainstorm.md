@@ -198,7 +198,15 @@ Phase 3 — Polish & grow (ongoing)
   ├── Social media links/feed
   └── SEO & Open Graph tags
 
-Phase 4 — Hosting migration (when ready)
+Phase 4 — Roster management portal (see full spec below)
+  ├── Supabase Auth — secure login for Leonard (and future admins)
+  ├── Protected /roster page — not accessible without login
+  ├── Volunteer roster table — sortable, filterable, searchable
+  ├── Status tracking — mark volunteers as New / Contacted / Active / Inactive
+  ├── Contact form inbox — view and action contact submissions
+  └── Mobile-friendly — Leonard may access from phone in the field
+
+Phase 5 — Hosting migration (when ready)
   ├── Gather hosting & domain intel from Roswell UMC IT (see questions below)
   ├── Decide on deployment method (FTP upload vs. GitHub Actions pipeline)
   ├── Configure Supabase credentials in new environment
@@ -266,3 +274,87 @@ The good news: because this is a **static site** (just HTML, CSS, and JS files),
 | **SSL is non-negotiable**  | The Supabase JS client requires HTTPS. The site will not function on plain HTTP. Confirm SSL is available before migrating.                                                          |
 | **Zero-downtime cutover**  | Lower DNS TTL to 5 minutes 24 hours before cutover. Upload files to new host. Switch DNS. Keep Netlify live for 24–48 hours as a fallback.                                           |
 | **No rush**                | There is no cost to keeping Netlify as-is indefinitely. Migration is only worth doing if RUMC hosting is preferred for organizational reasons.                                       |
+
+---
+
+## 👤 Phase 4 — Roster Management Portal
+
+### Why This Matters
+
+Currently, Leonard views volunteer signups by logging into **Supabase Studio** — a raw database admin tool that requires navigating a technical interface not designed for everyday use. This is a workable interim solution but is not sustainable long-term.
+
+A purpose-built, password-protected roster page gives Leonard (and any future DARE admins) a clean, simple interface to manage volunteers, track follow-ups, and view contact form submissions — without any technical knowledge required.
+
+> **Note:** This replaces the "use Supabase Studio for everything" interim approach once built. Supabase Studio remains available as a power-user fallback.
+
+---
+
+### 🔐 Security Model
+
+Authentication will be handled by **Supabase Auth** — the same platform already in use for the database. This avoids introducing a separate auth system and keeps everything in one place.
+
+| Requirement            | Implementation                                                                               |
+| ---------------------- | -------------------------------------------------------------------------------------------- |
+| **Login**              | Email + strong password via Supabase Auth                                                    |
+| **Session management** | JWT tokens with automatic expiry                                                             |
+| **Route protection**   | `/roster` page checks auth state on load; redirects to login if unauthenticated              |
+| **RLS enforcement**    | Supabase Row Level Security ensures only authenticated users can read volunteer/contact data |
+| **Password strength**  | Minimum 12 characters enforced at account creation                                           |
+| **Who can access**     | Leonard Scarboro + any future admins explicitly added in Supabase Auth                       |
+| **Public anon key**    | Cannot access protected tables — RLS blocks all reads from unauthenticated requests          |
+
+---
+
+### 📋 Roster Page Feature Spec
+
+#### Volunteer Roster Tab
+
+- Table view of all volunteer submissions with columns:
+  - Name, Email, Phone, Organization, Skills, Availability, Date Signed Up, Status
+- **Status field** — track each volunteer through a simple workflow:
+  - `New` → `Contacted` → `Active` → `Inactive`
+- Sort by any column (date, name, status)
+- Filter by availability or status
+- Search by name, email, or organization
+- Click a row to view full submission details
+- Export to CSV for use in email campaigns or spreadsheets
+
+#### Contact Inbox Tab
+
+- Table view of all contact form submissions
+- Columns: Name, Email, Subject, Message preview, Date, Read/Unread status
+- Mark messages as read
+- Click to view full message
+
+#### Impact Stats Tab
+
+- Simple form to update the six impact counter numbers
+- Replaces the need to use Supabase Studio for this task entirely
+- "Last updated" timestamp shown after save
+
+---
+
+### 🏗️ Technical Approach
+
+```
+/roster              → protected — redirects to /login if not authenticated
+/roster/login        → Supabase Auth email/password login form
+/roster/volunteers   → volunteer roster table
+/roster/contacts     → contact form inbox
+/roster/stats        → impact stats editor
+```
+
+- Built as additional static pages in the Eleventy site
+- Supabase Auth JS client handles login/session on the client side
+- RLS policies updated to allow authenticated users (not just anon) to SELECT from volunteers and contacts tables
+- No server-side code required — fully client-side auth via Supabase JS SDK
+
+---
+
+### ❓ Questions to Resolve Before Building
+
+1. **Who needs access besides Leonard?** Any co-directors, volunteers, or church staff who should be able to view the roster?
+2. **Should admins be able to delete volunteer records?** Or only update status?
+3. **Email notifications?** Should Leonard receive an email when a new volunteer signs up? (Supabase has built-in webhooks for this)
+4. **Data retention policy?** How long should volunteer records be kept? Any privacy considerations given the church context?
+5. **Mobile priority?** Will Leonard primarily access this from a phone, tablet, or desktop?
