@@ -405,6 +405,16 @@ h4 {
   top: 100px;
 }
 
+.about-logo {
+  width: 100%;
+  max-width: 420px;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
+
 .image-placeholder {
   background: var(--color-sand);
   border: 2px dashed var(--color-sand-dark);
@@ -890,6 +900,20 @@ h4 {
 /* --- Our Story / History Timeline --- */
 .history {
   background: var(--color-sand);
+}
+
+.history-comic {
+  max-width: 860px;
+  margin: 0 auto 56px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+}
+
+.history-comic img {
+  width: 100%;
+  height: auto;
+  display: block;
 }
 
 .timeline {
