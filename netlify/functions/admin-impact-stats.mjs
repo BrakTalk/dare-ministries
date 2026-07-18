@@ -42,7 +42,7 @@ export default async (req) => {
   }
 
   const db = getDatabase();
-  await db.sql`
+  const updated = await db.sql`
     UPDATE impact_stats SET
       homes_repaired        = ${values.homes_repaired},
       volunteer_hours       = ${values.volunteer_hours},
@@ -52,7 +52,9 @@ export default async (req) => {
       years_of_service      = ${values.years_of_service},
       updated_at            = NOW()
     WHERE id = 1
+    RETURNING id
   `;
+  if (!updated.length) return json({ error: 'Impact stats not found' }, 404);
 
   return json({ ok: true });
 };
