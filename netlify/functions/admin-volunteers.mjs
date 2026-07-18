@@ -1,6 +1,6 @@
 // /api/admin/volunteers — roster management (list, update status/notes, delete).
 import { getDatabase } from '@netlify/database';
-import { json, readBody, cleanText } from './lib/helpers.mjs';
+import { json, readBody, cleanText, isValidEmail } from './lib/helpers.mjs';
 import { requireAuth } from './lib/auth.mjs';
 
 export const config = { path: '/api/admin/volunteers' };
@@ -16,6 +16,37 @@ export default async (req) => {
   if (req.method === 'GET') {
     const rows = await db.sql`SELECT * FROM volunteers ORDER BY created_at DESC`;
     return json(rows);
+  }
+
+  // Manual roster entry from the console (walk-ups, phone calls, spreadsheet
+  // rows) — unlike the public form, admins may set the status directly.
+  if (req.method === 'POST') {
+    const body = await readBody(req);
+    if (!body) return json({ error: 'Invalid request body' }, 400);
+
+    const name = cleanText(body.name, 200);
+    const email = cleanText(body.email, 200);
+    if (!name || !isValidEmail(email)) {
+      return json({ error: 'Name and a valid email are required' }, 400);
+    }
+    const status = body.status ?? 'new';
+    if (!STATUSES.includes(status)) return json({ error: 'Invalid status' }, 400);
+
+    const rows = await db.sql`
+      INSERT INTO volunteers (name, email, phone, organization, skills, availability, notes, status)
+      VALUES (
+        ${name},
+        ${email},
+        ${cleanText(body.phone, 50)},
+        ${cleanText(body.organization, 200)},
+        ${cleanText(body.skills, 2000)},
+        ${cleanText(body.availability, 50)},
+        ${cleanText(body.notes, 2000)},
+        ${status}
+      )
+      RETURNING id
+    `;
+    return json({ ok: true, id: rows[0].id }, 201);
   }
 
   if (req.method === 'PATCH') {

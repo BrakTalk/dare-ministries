@@ -264,7 +264,9 @@
     if (e.target === this) closeDetail();
   });
   document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && !$('detailOverlay').classList.contains('hidden')) closeDetail();
+    if (e.key !== 'Escape') return;
+    if (!$('detailOverlay').classList.contains('hidden')) closeDetail();
+    if (!$('addOverlay').classList.contains('hidden')) closeAdd();
   });
 
   $('detailSave').addEventListener('click', async function () {
@@ -304,6 +306,60 @@
       alert('Delete failed: ' + err.message);
     } finally {
       this.disabled = false;
+    }
+  });
+
+  // ─── Add volunteer modal ────────────────────────────────────────────────────
+
+  let addTrigger = null; // element to restore focus to when the add dialog closes
+
+  function openAdd() {
+    addTrigger = document.activeElement;
+    $('addForm').reset();
+    $('addError').classList.add('hidden');
+    $('addOverlay').classList.remove('hidden');
+    $('add-name').focus();
+  }
+
+  function closeAdd() {
+    $('addOverlay').classList.add('hidden');
+    if (addTrigger && document.contains(addTrigger)) addTrigger.focus();
+    addTrigger = null;
+  }
+
+  $('addVolunteerBtn').addEventListener('click', openAdd);
+  $('addClose').addEventListener('click', closeAdd);
+  $('addCancel').addEventListener('click', closeAdd);
+  $('addOverlay').addEventListener('click', function (e) {
+    if (e.target === this) closeAdd();
+  });
+
+  $('addForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const btn = this.querySelector('button[type="submit"]');
+    btn.disabled = true;
+    $('addError').classList.add('hidden');
+    try {
+      await api('/api/admin/volunteers', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: $('add-name').value.trim(),
+          email: $('add-email').value.trim(),
+          phone: $('add-phone').value.trim() || null,
+          organization: $('add-organization').value.trim() || null,
+          skills: $('add-skills').value.trim() || null,
+          availability: $('add-availability').value || null,
+          status: $('add-status').value,
+          notes: $('add-notes').value.trim() || null,
+        }),
+      });
+      closeAdd();
+      await loadVolunteers();
+    } catch (err) {
+      $('addError').textContent = 'Could not add volunteer: ' + err.message;
+      $('addError').classList.remove('hidden');
+    } finally {
+      btn.disabled = false;
     }
   });
 
