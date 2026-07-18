@@ -72,12 +72,12 @@ eleventyExcludeFromCollections: true
         <table class="roster-table" id="volunteerTable">
           <thead>
             <tr>
-              <th data-sort="name">Name</th>
-              <th data-sort="email">Email</th>
-              <th data-sort="organization">Organization</th>
-              <th data-sort="availability">Availability</th>
-              <th data-sort="created_at">Signed Up</th>
-              <th data-sort="status">Status</th>
+              <th data-sort="name" scope="col" tabindex="0">Name</th>
+              <th data-sort="email" scope="col" tabindex="0">Email</th>
+              <th data-sort="organization" scope="col" tabindex="0">Organization</th>
+              <th data-sort="availability" scope="col" tabindex="0">Availability</th>
+              <th data-sort="created_at" scope="col" tabindex="0">Signed Up</th>
+              <th data-sort="status" scope="col" tabindex="0">Status</th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -112,7 +112,7 @@ eleventyExcludeFromCollections: true
 
   <!-- Volunteer detail modal -->
   <div id="detailOverlay" class="roster-overlay hidden">
-    <div class="roster-modal" role="dialog" aria-modal="true">
+    <div class="roster-modal" role="dialog" aria-modal="true" aria-labelledby="detailName">
       <button class="modal-close" id="detailClose" aria-label="Close">&times;</button>
       <h2 id="detailName"></h2>
       <dl id="detailFields" class="detail-fields"></dl>

@@ -168,14 +168,19 @@
 
     document.querySelectorAll('#volunteerTable th').forEach((th) => {
       th.classList.remove('sorted-asc', 'sorted-desc');
-      if (th.dataset.sort === sortKey) th.classList.add('sorted-' + sortDir);
+      const sorted = th.dataset.sort === sortKey;
+      if (sorted) th.classList.add('sorted-' + sortDir);
+      th.setAttribute(
+        'aria-sort',
+        sorted ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'
+      );
     });
 
     const tbody = document.querySelector('#volunteerTable tbody');
     tbody.innerHTML = rows
       .map(
         (v) => `
-        <tr data-id="${esc(v.id)}">
+        <tr data-id="${esc(v.id)}" tabindex="0">
           <td>${esc(v.name)}</td>
           <td>${esc(v.email)}</td>
           <td>${esc(v.organization) || '—'}</td>
@@ -187,7 +192,13 @@
       .join('');
 
     tbody.querySelectorAll('tr').forEach((tr) => {
-      tr.addEventListener('click', () => openDetail(tr.dataset.id));
+      tr.addEventListener('click', () => openDetail(tr.dataset.id, tr));
+      tr.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          openDetail(tr.dataset.id, tr);
+        }
+      });
     });
   }
 
@@ -196,8 +207,8 @@
   });
 
   document.querySelectorAll('#volunteerTable th[data-sort]').forEach((th) => {
-    th.addEventListener('click', function () {
-      const key = this.dataset.sort;
+    const toggleSort = function () {
+      const key = th.dataset.sort;
       if (sortKey === key) {
         sortDir = sortDir === 'asc' ? 'desc' : 'asc';
       } else {
@@ -205,14 +216,24 @@
         sortDir = 'asc';
       }
       renderVolunteers();
+    };
+    th.addEventListener('click', toggleSort);
+    th.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        toggleSort();
+      }
     });
   });
 
   // ─── Volunteer detail modal ─────────────────────────────────────────────────
 
-  function openDetail(id) {
+  let detailTrigger = null; // element to restore focus to when the dialog closes
+
+  function openDetail(id, trigger) {
     currentDetail = volunteers.find((v) => v.id === id);
     if (!currentDetail) return;
+    detailTrigger = trigger || document.activeElement;
 
     $('detailName').textContent = currentDetail.name;
     $('detailFields').innerHTML = [
@@ -228,16 +249,22 @@
     $('detailStatus').value = currentDetail.status;
     $('detailNotes').value = currentDetail.notes || '';
     $('detailOverlay').classList.remove('hidden');
+    $('detailClose').focus();
   }
 
   function closeDetail() {
     $('detailOverlay').classList.add('hidden');
     currentDetail = null;
+    if (detailTrigger && document.contains(detailTrigger)) detailTrigger.focus();
+    detailTrigger = null;
   }
 
   $('detailClose').addEventListener('click', closeDetail);
   $('detailOverlay').addEventListener('click', function (e) {
     if (e.target === this) closeDetail();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && !$('detailOverlay').classList.contains('hidden')) closeDetail();
   });
 
   $('detailSave').addEventListener('click', async function () {
@@ -321,7 +348,7 @@
     $('contactList').innerHTML = contacts
       .map(
         (c) => `
-        <div class="contact-card ${c.read_at ? '' : 'unread'}" data-id="${esc(c.id)}">
+        <div class="contact-card ${c.read_at ? '' : 'unread'}" data-id="${esc(c.id)}" tabindex="0">
           <div class="contact-meta">
             <span class="contact-name">${esc(c.name)} &lt;${esc(c.email)}&gt;</span>
             <span>${esc(c.subject) || 'No subject'} · ${fmtDate(c.created_at)}</span>
@@ -340,6 +367,14 @@
     $('contactList')
       .querySelectorAll('.contact-card')
       .forEach((card) => {
+        card.addEventListener('keydown', function (e) {
+          // Enter/Space on the card toggles it open; inner buttons are real
+          // <button> elements and handle their own keyboard activation.
+          if ((e.key === 'Enter' || e.key === ' ') && e.target === card) {
+            e.preventDefault();
+            card.click();
+          }
+        });
         card.addEventListener('click', async function (e) {
           const id = this.dataset.id;
           const contact = contacts.find((c) => c.id === id);
