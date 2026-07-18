@@ -19,6 +19,9 @@ export default async (req) => {
   if (req.method === 'PATCH') {
     const body = await readBody(req);
     if (!body?.id) return json({ error: 'id is required' }, 400);
+    if (typeof body.read !== 'boolean') {
+      return json({ error: 'read must be a boolean' }, 400);
+    }
     if (body.read) {
       await db.sql`UPDATE contacts SET read_at = NOW() WHERE id = ${body.id} AND read_at IS NULL`;
     } else {
