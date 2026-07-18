@@ -20,7 +20,7 @@ This is an Eleventy (v3) static site for D.A.R.E. Ministries, a faith-based disa
 - **CMS:** Sveltia CMS configured at `src/admin/config.yml` with GitHub backend
 - **Static assets:** `src/css/`, `src/js/`, `src/images/` (passed through by Eleventy)
 - **Custom filters:** Defined in `.eleventy.js` — date (Luxon), truncate, striptags, capitalize
-- **Single-page site:** `src/index.njk` is the main (and only) page template
+- **Pages:** `src/index.njk` is the public single-page site; `src/roster.njk` is the admin console at `/roster`
 
 ## Key Conventions
 
