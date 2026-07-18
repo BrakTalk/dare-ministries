@@ -321,7 +321,13 @@
       'notes',
       'created_at',
     ];
-    const csvCell = (value) => '"' + String(value == null ? '' : value).replace(/"/g, '""') + '"';
+    const csvCell = (value) => {
+      let cell = String(value == null ? '' : value);
+      // Prefix formula-like values so spreadsheet apps treat them as text
+      // (CSV injection: volunteer-controlled fields starting with = + - @).
+      if (/^\s*[=+\-@]/.test(cell)) cell = "'" + cell;
+      return '"' + cell.replace(/"/g, '""') + '"';
+    };
     const lines = [cols.join(',')].concat(
       filteredVolunteers().map((v) => cols.map((c) => csvCell(v[c])).join(','))
     );
