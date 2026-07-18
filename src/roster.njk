@@ -1,0 +1,141 @@
+---
+layout: false
+permalink: /roster/index.html
+eleventyExcludeFromCollections: true
+---
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Roster Console — D.A.R.E. Ministries</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700;900&family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/roster.css">
+</head>
+<body class="roster-body">
+
+  <header class="roster-header">
+    <a href="/" class="nav-logo">
+      <span class="logo-dare">D.A.R.E.</span>
+      <span class="logo-sub">Roster Console</span>
+    </a>
+    <button id="logoutBtn" class="btn btn-outline btn-small hidden">Log Out</button>
+  </header>
+
+  <!-- Login view -->
+  <main id="loginView" class="roster-login hidden">
+    <form id="loginForm" class="roster-login-card">
+      <h1>Admin Login</h1>
+      <p>Enter the admin password to manage the volunteer roster.</p>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" autocomplete="current-password" required>
+      </div>
+      <button type="submit" class="btn btn-primary btn-full">Log In</button>
+      <p id="loginError" class="form-error hidden">Incorrect password. Please try again.</p>
+    </form>
+  </main>
+
+  <!-- Console view -->
+  <main id="consoleView" class="roster-console hidden">
+    <nav class="roster-tabs" role="tablist">
+      <button class="roster-tab active" data-tab="volunteers">Volunteers <span id="volunteerCount" class="tab-badge"></span></button>
+      <button class="roster-tab" data-tab="contacts">Inbox <span id="unreadCount" class="tab-badge"></span></button>
+      <button class="roster-tab" data-tab="stats">Impact Stats</button>
+    </nav>
+
+    <!-- Volunteers tab -->
+    <section id="tab-volunteers" class="roster-panel">
+      <div class="roster-toolbar">
+        <input type="search" id="volunteerSearch" placeholder="Search name, email, organization…">
+        <select id="statusFilter">
+          <option value="">All statuses</option>
+          <option value="new">New</option>
+          <option value="contacted">Contacted</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+        <select id="availabilityFilter">
+          <option value="">All availability</option>
+          <option value="weekdays">Weekdays</option>
+          <option value="weekends">Weekends</option>
+          <option value="multi-day">Multi-day</option>
+          <option value="flexible">Flexible</option>
+        </select>
+        <button id="exportCsvBtn" class="btn btn-outline btn-small">Export CSV</button>
+      </div>
+      <div class="roster-table-wrap">
+        <table class="roster-table" id="volunteerTable">
+          <thead>
+            <tr>
+              <th data-sort="name">Name</th>
+              <th data-sort="email">Email</th>
+              <th data-sort="organization">Organization</th>
+              <th data-sort="availability">Availability</th>
+              <th data-sort="created_at">Signed Up</th>
+              <th data-sort="status">Status</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <p id="volunteerEmpty" class="roster-empty hidden">No volunteers match.</p>
+      </div>
+    </section>
+
+    <!-- Contacts tab -->
+    <section id="tab-contacts" class="roster-panel hidden">
+      <div class="roster-list" id="contactList"></div>
+      <p id="contactEmpty" class="roster-empty hidden">No messages yet.</p>
+    </section>
+
+    <!-- Stats tab -->
+    <section id="tab-stats" class="roster-panel hidden">
+      <form id="statsForm" class="roster-stats-form">
+        <div class="stats-grid">
+          <div class="form-group"><label for="homes_repaired">Homes Repaired</label><input type="number" min="0" id="homes_repaired" required></div>
+          <div class="form-group"><label for="families_helped">Families Helped</label><input type="number" min="0" id="families_helped" required></div>
+          <div class="form-group"><label for="deployments_completed">Deployments</label><input type="number" min="0" id="deployments_completed" required></div>
+          <div class="form-group"><label for="volunteer_hours">Volunteer Hours</label><input type="number" min="0" id="volunteer_hours" required></div>
+          <div class="form-group"><label for="partner_organizations">Partner Organizations</label><input type="number" min="0" id="partner_organizations" required></div>
+          <div class="form-group"><label for="years_of_service">Years of Service</label><input type="number" min="0" id="years_of_service" required></div>
+        </div>
+        <p class="roster-stats-note">These numbers power the "Our Impact" counter on the public site. Last updated: <span id="statsUpdated">—</span></p>
+        <button type="submit" class="btn btn-primary">Save Numbers</button>
+        <span id="statsSaved" class="stats-saved hidden">Saved ✓</span>
+      </form>
+    </section>
+  </main>
+
+  <!-- Volunteer detail modal -->
+  <div id="detailOverlay" class="roster-overlay hidden">
+    <div class="roster-modal" role="dialog" aria-modal="true">
+      <button class="modal-close" id="detailClose" aria-label="Close">&times;</button>
+      <h2 id="detailName"></h2>
+      <dl id="detailFields" class="detail-fields"></dl>
+      <div class="form-group">
+        <label for="detailStatus">Status</label>
+        <select id="detailStatus">
+          <option value="new">New</option>
+          <option value="contacted">Contacted</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="detailNotes">Notes</label>
+        <textarea id="detailNotes" rows="4"></textarea>
+      </div>
+      <div class="modal-actions">
+        <button id="detailSave" class="btn btn-primary">Save</button>
+        <button id="detailDelete" class="btn btn-danger">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/roster.js" defer></script>
+</body>
+</html>

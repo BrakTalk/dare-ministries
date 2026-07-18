@@ -1,0 +1,420 @@
+/* ============================================
+   D.A.R.E. Ministries — Roster Admin Console
+   Builds on the variables in style.css
+   ============================================ */
+
+.roster-body {
+  min-height: 100vh;
+  background: var(--color-sand);
+}
+
+.roster-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  background: var(--color-primary);
+  box-shadow: var(--shadow-md);
+}
+
+.roster-header .logo-sub {
+  color: var(--color-accent-light);
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* --- Login --- */
+
+.roster-login {
+  display: flex;
+  justify-content: center;
+  padding: 4rem 1rem;
+}
+
+.roster-login-card {
+  background: var(--color-white);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  padding: 2rem;
+  width: 100%;
+  max-width: 400px;
+}
+
+.roster-login-card h1 {
+  font-family: var(--font-heading);
+  font-size: 1.5rem;
+  color: var(--color-primary);
+  margin-bottom: 0.5rem;
+}
+
+.roster-login-card p {
+  color: var(--color-text-light);
+  font-size: 0.95rem;
+  margin-bottom: 1.25rem;
+}
+
+/* --- Console layout --- */
+
+.roster-console {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 4rem;
+}
+
+.roster-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.roster-tab {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.95rem;
+  padding: 0.55rem 1.1rem;
+  border: 2px solid var(--color-primary);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--color-primary);
+  cursor: pointer;
+}
+
+.roster-tab.active {
+  background: var(--color-primary);
+  color: var(--color-white);
+}
+
+.tab-badge {
+  display: inline-block;
+  min-width: 1.4em;
+  padding: 0 0.35em;
+  margin-left: 0.35em;
+  border-radius: 999px;
+  background: var(--color-accent);
+  color: var(--color-white);
+  font-size: 0.8em;
+  text-align: center;
+}
+
+.tab-badge:empty {
+  display: none;
+}
+
+/* --- Toolbar --- */
+
+.roster-toolbar {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.roster-toolbar input[type='search'] {
+  flex: 1 1 220px;
+}
+
+.roster-toolbar input,
+.roster-toolbar select,
+.roster-login-card input,
+.roster-modal input,
+.roster-modal select,
+.roster-modal textarea,
+.roster-stats-form input {
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--color-sand-dark);
+  border-radius: var(--radius);
+  background: var(--color-white);
+  color: var(--color-text);
+}
+
+/* --- Volunteers table --- */
+
+.roster-table-wrap {
+  overflow-x: auto;
+  background: var(--color-white);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.roster-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+.roster-table th,
+.roster-table td {
+  text-align: left;
+  padding: 0.7rem 0.9rem;
+  border-bottom: 1px solid var(--color-sand-dark);
+  white-space: nowrap;
+}
+
+.roster-table th {
+  background: var(--color-sand);
+  font-weight: 700;
+  color: var(--color-primary);
+  cursor: pointer;
+  user-select: none;
+  position: sticky;
+  top: 0;
+}
+
+.roster-table th[data-sort]::after {
+  content: ' ↕';
+  opacity: 0.35;
+}
+
+.roster-table th.sorted-asc::after {
+  content: ' ↑';
+  opacity: 1;
+}
+
+.roster-table th.sorted-desc::after {
+  content: ' ↓';
+  opacity: 1;
+}
+
+.roster-table tbody tr {
+  cursor: pointer;
+}
+
+.roster-table tbody tr:hover {
+  background: var(--color-cream);
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 0.1rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.status-new {
+  background: #e8f0fb;
+  color: var(--color-primary-light);
+}
+
+.status-contacted {
+  background: #fdf3e3;
+  color: var(--color-accent-dark);
+}
+
+.status-active {
+  background: #e6f2e8;
+  color: var(--color-success);
+}
+
+.status-inactive {
+  background: var(--color-sand-dark);
+  color: var(--color-text-light);
+}
+
+.roster-empty {
+  padding: 2rem;
+  text-align: center;
+  color: var(--color-text-light);
+}
+
+/* --- Contact inbox --- */
+
+.roster-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.contact-card {
+  background: var(--color-white);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  padding: 0.9rem 1.1rem;
+  cursor: pointer;
+  border-left: 4px solid transparent;
+}
+
+.contact-card.unread {
+  border-left-color: var(--color-accent);
+}
+
+.contact-card.unread .contact-name {
+  font-weight: 700;
+}
+
+.contact-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  color: var(--color-text-light);
+  font-size: 0.85rem;
+}
+
+.contact-preview {
+  color: var(--color-text-light);
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.contact-card.open .contact-preview {
+  white-space: pre-wrap;
+  color: var(--color-text);
+}
+
+.contact-actions {
+  margin-top: 0.6rem;
+  display: none;
+  gap: 0.5rem;
+}
+
+.contact-card.open .contact-actions {
+  display: flex;
+}
+
+/* --- Stats form --- */
+
+.roster-stats-form {
+  background: var(--color-white);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 1.5rem;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.roster-stats-note {
+  color: var(--color-text-light);
+  font-size: 0.88rem;
+  margin-bottom: 1rem;
+}
+
+.stats-saved {
+  margin-left: 0.75rem;
+  color: var(--color-success);
+  font-weight: 600;
+}
+
+/* --- Modal --- */
+
+.roster-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(27, 58, 92, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 100;
+}
+
+.roster-modal {
+  background: var(--color-white);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 1.75rem;
+  width: 100%;
+  max-width: 520px;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+}
+
+.roster-modal h2 {
+  font-family: var(--font-heading);
+  color: var(--color-primary);
+  margin-bottom: 1rem;
+  padding-right: 2rem;
+}
+
+.modal-close {
+  position: absolute;
+  top: 0.9rem;
+  right: 1.1rem;
+  border: none;
+  background: none;
+  font-size: 1.6rem;
+  line-height: 1;
+  color: var(--color-text-light);
+  cursor: pointer;
+}
+
+.detail-fields {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.3rem 1rem;
+  margin-bottom: 1.1rem;
+  font-size: 0.93rem;
+}
+
+.detail-fields dt {
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.detail-fields dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 1.25rem;
+}
+
+.btn-danger {
+  background: #b3402e;
+  color: var(--color-white);
+  border: none;
+}
+
+.btn-danger:hover {
+  background: #93331f;
+}
+
+.btn-small {
+  padding: 0.45rem 1rem;
+  font-size: 0.85rem;
+}
+
+.roster-modal .form-group,
+.roster-login-card .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-bottom: 1rem;
+}
+
+.roster-modal label,
+.roster-login-card label,
+.roster-stats-form label {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--color-primary);
+}
+
+@media (max-width: 640px) {
+  .roster-table th,
+  .roster-table td {
+    padding: 0.55rem 0.6rem;
+  }
+
+  .modal-actions {
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+}
