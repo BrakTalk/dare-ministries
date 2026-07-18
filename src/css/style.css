@@ -19,6 +19,12 @@
   --color-text-light: #5a5650; /* Lighter text */
   --color-white: #ffffff;
   --color-success: #3a7d44; /* Green for active status */
+  --color-danger: #b3402e; /* Destructive actions (delete) */
+  --color-danger-dark: #93331f; /* Danger hover state */
+  --color-status-new-bg: #e8f0fb; /* Roster status badge tints */
+  --color-status-contacted-bg: #fdf3e3;
+  --color-status-active-bg: #e6f2e8;
+  --color-overlay: rgba(27, 58, 92, 0.55); /* Modal backdrop (primary @ 55%) */
 
   --font-heading: 'Merriweather', Georgia, serif;
   --font-body: 'Open Sans', -apple-system, BlinkMacSystemFont, sans-serif;

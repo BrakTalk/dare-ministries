@@ -198,17 +198,17 @@
 }
 
 .status-new {
-  background: #e8f0fb;
+  background: var(--color-status-new-bg);
   color: var(--color-primary-light);
 }
 
 .status-contacted {
-  background: #fdf3e3;
+  background: var(--color-status-contacted-bg);
   color: var(--color-accent-dark);
 }
 
 .status-active {
-  background: #e6f2e8;
+  background: var(--color-status-active-bg);
   color: var(--color-success);
 }
 
@@ -313,7 +313,7 @@
 .roster-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(27, 58, 92, 0.55);
+  background: var(--color-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -377,13 +377,13 @@
 }
 
 .btn-danger {
-  background: #b3402e;
+  background: var(--color-danger);
   color: var(--color-white);
   border: none;
 }
 
 .btn-danger:hover {
-  background: #93331f;
+  background: var(--color-danger-dark);
 }
 
 .btn-small {
