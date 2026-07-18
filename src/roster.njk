@@ -51,15 +51,15 @@ eleventyExcludeFromCollections: true
     <!-- Volunteers tab -->
     <section id="tab-volunteers" class="roster-panel">
       <div class="roster-toolbar">
-        <input type="search" id="volunteerSearch" placeholder="Search name, email, organization…">
-        <select id="statusFilter">
+        <input type="search" id="volunteerSearch" aria-label="Search volunteers" placeholder="Search name, email, organization…">
+        <select id="statusFilter" aria-label="Filter volunteers by status">
           <option value="">All statuses</option>
           <option value="new">New</option>
           <option value="contacted">Contacted</option>
           <option value="active">Active</option>
           <option value="inactive">Inactive</option>
         </select>
-        <select id="availabilityFilter">
+        <select id="availabilityFilter" aria-label="Filter volunteers by availability">
           <option value="">All availability</option>
           <option value="weekdays">Weekdays</option>
           <option value="weekends">Weekends</option>
