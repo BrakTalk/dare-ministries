@@ -12,7 +12,7 @@ export default async (req) => {
   if (!rows.length) return json({ error: 'Not found' }, 404);
 
   return json(rows[0], 200, {
-    // Stats change rarely; let Netlify's CDN cache them for an hour.
-    'Cache-Control': 'public, max-age=300, s-maxage=3600',
+    // Short CDN cache so admin edits in /roster show up within a few minutes.
+    'Cache-Control': 'public, max-age=0, s-maxage=300',
   });
 };
