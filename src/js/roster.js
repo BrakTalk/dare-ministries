@@ -55,11 +55,29 @@
     $('logoutBtn').classList.add('hidden');
   }
 
+  // Loads panels independently — one failing panel must not read as an auth
+  // failure or block the others. Session expiry is handled inside api() (401
+  // drops back to the login view), so this function never throws.
   async function showConsole() {
     $('loginView').classList.add('hidden');
     $('consoleView').classList.remove('hidden');
     $('logoutBtn').classList.remove('hidden');
-    await Promise.all([loadVolunteers(), loadContacts(), loadStats()]);
+
+    const panels = [
+      { load: loadVolunteers, emptyEl: 'volunteerEmpty' },
+      { load: loadContacts, emptyEl: 'contactEmpty' },
+      { load: loadStats, emptyEl: null },
+    ];
+    const results = await Promise.allSettled(panels.map((p) => p.load()));
+    results.forEach((result, i) => {
+      if (result.status !== 'rejected') return;
+      console.error('Panel failed to load:', result.reason);
+      const el = panels[i].emptyEl && $(panels[i].emptyEl);
+      if (el) {
+        el.textContent = 'Could not load — refresh to try again.';
+        el.classList.remove('hidden');
+      }
+    });
   }
 
   // ─── Auth ───────────────────────────────────────────────────────────────────
@@ -70,18 +88,24 @@
     const btn = this.querySelector('button');
     btn.disabled = true;
     btn.textContent = 'Logging in…';
+    // Only the login request itself may trigger the password error —
+    // post-auth data loading has its own error handling in showConsole().
+    let loggedIn = false;
     try {
       await api('/api/admin/login', {
         method: 'POST',
         body: JSON.stringify({ password: $('password').value }),
       });
-      $('password').value = '';
-      await showConsole();
+      loggedIn = true;
     } catch {
       $('loginError').classList.remove('hidden');
     } finally {
       btn.disabled = false;
       btn.textContent = 'Log In';
+    }
+    if (loggedIn) {
+      $('password').value = '';
+      await showConsole();
     }
   });
 
@@ -413,14 +437,15 @@
   // ─── Boot ───────────────────────────────────────────────────────────────────
 
   (async function init() {
+    let authenticated = false;
     try {
-      const { authenticated } = await api('/api/admin/login');
-      if (authenticated) {
-        await showConsole();
-      } else {
-        showLogin();
-      }
+      ({ authenticated } = await api('/api/admin/login'));
     } catch {
+      // Session check unreachable — treat as logged out.
+    }
+    if (authenticated) {
+      await showConsole();
+    } else {
       showLogin();
     }
   })();
