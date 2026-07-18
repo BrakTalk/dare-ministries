@@ -25,7 +25,16 @@ export default async (req) => {
 
   const values = {};
   for (const field of FIELDS) {
-    const n = Number(body[field]);
+    // Guard against Number() coercion quirks: '', null, and false all become 0,
+    // which would silently zero a counter.
+    const raw = body[field];
+    if (
+      (typeof raw !== 'string' && typeof raw !== 'number') ||
+      (typeof raw === 'string' && !raw.trim())
+    ) {
+      return json({ error: `${field} must be a non-negative whole number` }, 400);
+    }
+    const n = Number(raw);
     if (!Number.isInteger(n) || n < 0 || n > 100000000) {
       return json({ error: `${field} must be a non-negative whole number` }, 400);
     }
