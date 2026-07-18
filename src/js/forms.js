@@ -1,9 +1,6 @@
-// D.A.R.E. Ministries — Supabase integration
-// Loaded as an ES module. Credentials are injected by Eleventy via window.__SUPABASE_*.
-
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-
-const supabase = createClient(window.__SUPABASE_URL__, window.__SUPABASE_KEY__);
+// D.A.R.E. Ministries — forms & impact counter
+// Talks to the site's own Netlify Functions (/api/*), which store data in
+// Netlify DB (Postgres). No credentials in the browser.
 
 // ─── Volunteer Form ───────────────────────────────────────────────────────────
 
@@ -27,10 +24,9 @@ if (volunteerForm) {
       notes: volunteerForm.querySelector('#message').value.trim() || null,
     };
 
-    const { error } = await supabase.from('volunteers').insert(data);
+    const ok = await submitJson('/api/volunteer', data);
 
-    if (error) {
-      console.error('Volunteer form error:', error);
+    if (!ok) {
       btn.disabled = false;
       btn.textContent = 'Sign Up to Volunteer';
       showFormError(volunteerForm);
@@ -62,10 +58,9 @@ if (contactForm) {
       message: contactForm.querySelector('#contact-message').value.trim(),
     };
 
-    const { error } = await supabase.from('contacts').insert(data);
+    const ok = await submitJson('/api/contact', data);
 
-    if (error) {
-      console.error('Contact form error:', error);
+    if (!ok) {
       btn.disabled = false;
       btn.textContent = 'Send Message';
       showFormError(contactForm);
@@ -73,6 +68,21 @@ if (contactForm) {
       showFormSuccess(contactForm, "Thank you for your message! We'll get back to you shortly.");
     }
   });
+}
+
+async function submitJson(url, data) {
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) console.error('Form error:', res.status, await res.text());
+    return res.ok;
+  } catch (err) {
+    console.error('Form error:', err);
+    return false;
+  }
 }
 
 // ─── Impact Counter ───────────────────────────────────────────────────────────
@@ -90,14 +100,14 @@ const impactSection = document.getElementById('impact');
 if (impactSection) {
   // 1. Fetch data immediately — don't wait for scroll
   (async () => {
-    const { data, error } = await supabase.from('impact_stats').select('*').eq('id', 1).single();
-
-    if (error || !data) {
-      console.error('Impact stats error:', error);
+    try {
+      const res = await fetch('/api/impact-stats');
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      _impactData = await res.json();
+    } catch (err) {
+      console.error('Impact stats error:', err);
       return;
     }
-
-    _impactData = data;
 
     // If section already visible when data arrives, animate now.
     if (_sectionVisible) renderImpactStats();

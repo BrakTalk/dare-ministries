@@ -1,3 +1,7 @@
+-- ⚠️ LEGACY — kept for historical reference only (July 2026).
+-- The site migrated from Supabase to Netlify DB. The live schema now lives in
+-- netlify/database/migrations/ and is applied automatically on deploy.
+--
 -- D.A.R.E. Ministries — Supabase Schema
 -- Run this in the Supabase SQL Editor: https://supabase.com/dashboard/project/_/sql
 -- ─────────────────────────────────────────────────────────────────────────────

@@ -7,3 +7,5 @@ _site/
 # Environment variables — never commit credentials
 .env
 .env.local
+# Netlify CLI local artifacts
+deno.lock

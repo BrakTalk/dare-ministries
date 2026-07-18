@@ -14,6 +14,8 @@ This is an Eleventy (v3) static site for D.A.R.E. Ministries, a faith-based disa
 
 - **Templating:** Nunjucks (.njk) with includes in `src/_includes/`
 - **Content data:** JSON files in `src/_data/` (site.json, projects.json, gallery.json) — these are the primary content source, edited via Sveltia CMS or directly
+- **Database:** Netlify DB (managed Postgres). Schema migrations live in `netlify/database/migrations/` and are applied automatically on deploy. Tables: `volunteers`, `contacts`, `impact_stats`.
+- **API:** Netlify Functions in `netlify/functions/` (`/api/volunteer`, `/api/contact`, `/api/impact-stats`) using `@netlify/database`. The front end (`src/js/forms.js`) calls these with plain `fetch` — no database credentials in the browser. Optional email notifications on form submissions via Resend (`RESEND_API_KEY`, `NOTIFY_EMAIL` env vars).
 - **CMS:** Sveltia CMS configured at `src/admin/config.yml` with GitHub backend
 - **Static assets:** `src/css/`, `src/js/`, `src/images/` (passed through by Eleventy)
 - **Custom filters:** Defined in `.eleventy.js` — date (Luxon), truncate, striptags, capitalize
