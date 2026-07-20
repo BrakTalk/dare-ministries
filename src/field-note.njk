@@ -8,13 +8,14 @@ pagination:
 permalink: "/field-notes/{{ note.slug }}/index.html"
 ---
 {% from "head.njk" import head %}
+{% set excerpt = note.body | markdown | striptags | truncate(160) %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  {{ head(note.title + " — From the Field — " + site.title, note.body | markdown | striptags | truncate(160)) }}
+  {{ head(note.title + " — From the Field — " + site.title, excerpt) }}
   <meta property="og:type" content="article">
   <meta property="og:title" content="{{ note.title }}">
-  <meta property="og:description" content="{{ note.body | markdown | striptags | truncate(160) }}">
+  <meta property="og:description" content="{{ excerpt }}">
   <meta property="og:url" content="{{ site.url }}/field-notes/{{ note.slug }}/">
   {% if note.cover %}
   <meta property="og:image" content="{{ site.url }}{{ note.cover.url }}">
