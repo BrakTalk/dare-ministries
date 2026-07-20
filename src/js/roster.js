@@ -32,10 +32,13 @@
     return res.json();
   }
 
+  // Escapes for BOTH text and quoted-attribute contexts: the textContent
+  // round-trip covers & < >, but not quotes — without the replacements a
+  // value like `" onmouseover="…` could break out of an attribute.
   function esc(value) {
     const div = document.createElement('div');
     div.textContent = value == null ? '' : String(value);
-    return div.innerHTML;
+    return div.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
   function fmtDate(iso) {
