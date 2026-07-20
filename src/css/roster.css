@@ -418,3 +418,115 @@
     gap: 0.6rem;
   }
 }
+
+/* --- Field notes --- */
+
+.roster-toolbar-hint {
+  color: var(--color-text-light);
+  font-size: 0.9rem;
+  margin-right: auto;
+}
+
+.note-card {
+  cursor: pointer;
+}
+
+.note-card .contact-actions {
+  align-items: center;
+}
+
+.status-draft {
+  background: var(--color-status-contacted-bg);
+  color: var(--color-accent-dark);
+}
+
+.status-published {
+  background: var(--color-status-active-bg);
+  color: var(--color-success);
+}
+
+.roster-modal--wide {
+  max-width: 760px;
+  width: 95%;
+}
+
+.note-dates {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.note-hint {
+  font-size: 0.8rem;
+  color: var(--color-text-light);
+  margin-top: 0.3rem;
+}
+
+.note-status-line {
+  font-size: 0.85rem;
+  color: var(--color-accent-dark);
+  font-weight: 600;
+}
+
+.note-photos h3 {
+  font-size: 1rem;
+  color: var(--color-primary);
+  margin-bottom: 0.6rem;
+}
+
+.photo-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.8rem;
+  margin-bottom: 0.8rem;
+}
+
+.photo-thumb {
+  margin: 0;
+  border: 1px solid var(--color-sand-dark);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--color-cream);
+}
+
+.photo-thumb img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  display: block;
+}
+
+.photo-thumb input[type='text'] {
+  width: 100%;
+  border: none;
+  border-top: 1px solid var(--color-sand-dark);
+  border-radius: 0;
+  font-size: 0.8rem;
+  padding: 0.35rem 0.5rem;
+}
+
+.photo-thumb-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.35rem 0.5rem;
+}
+
+.photo-cover-label {
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.photo-status {
+  margin-left: 0.6rem;
+  font-size: 0.85rem;
+  color: var(--color-text-light);
+}
+
+@media (max-width: 640px) {
+  .note-dates {
+    grid-template-columns: 1fr;
+  }
+}

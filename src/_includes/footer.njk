@@ -1,0 +1,42 @@
+{# Shared footer. Links use /#anchor form so they work from any page. #}
+<footer class="footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-about">
+        <div class="footer-logo">
+          <span class="logo-dare">D.A.R.E.</span>
+          <span class="logo-sub">Ministries</span>
+        </div>
+        <p>Disaster Assistance and Relief Effort</p>
+        <p class="footer-tagline">"{{ site.scripture }}"</p>
+      </div>
+      <div class="footer-links">
+        <h4>Quick Links</h4>
+        <ul>
+          <li><a href="/#about">Our Mission</a></li>
+          <li><a href="/#projects">Current Projects</a></li>
+          <li><a href="/field-notes/">From the Field</a></li>
+          <li><a href="/#volunteer">Volunteer</a></li>
+          <li><a href="/#donate">Donate</a></li>
+          <li><a href="/#contact">Contact</a></li>
+        </ul>
+      </div>
+      <div class="footer-contact">
+        <h4>Contact</h4>
+        <p>{{ site.contact.name }}</p>
+        <p><a href="mailto:{{ site.contact.email }}">{{ site.contact.email }}</a></p>
+        <p><a href="tel:+17063402221">{{ site.contact.phone }}</a></p>
+      </div>
+      <div class="footer-partners">
+        <h4>Partners</h4>
+        {% for partner in site.partners %}
+        <p>{{ partner }}</p>
+        {% endfor %}
+        <p class="footer-affiliation">{{ site.affiliation }}</p>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>&copy; {{ "now" | date("YYYY") }} D.A.R.E. Ministries &mdash; Disaster Assistance and Relief Effort. All rights reserved.</p>
+    </div>
+  </div>
+</footer>

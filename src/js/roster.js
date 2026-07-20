@@ -67,6 +67,7 @@
       { load: loadVolunteers, emptyEl: 'volunteerEmpty' },
       { load: loadContacts, emptyEl: 'contactEmpty' },
       { load: loadStats, emptyEl: null },
+      { load: loadFieldNotes, emptyEl: 'noteEmpty' },
     ];
     const results = await Promise.allSettled(panels.map((p) => p.load()));
     results.forEach((result, i) => {
@@ -267,6 +268,7 @@
     if (e.key !== 'Escape') return;
     if (!$('detailOverlay').classList.contains('hidden')) closeDetail();
     if (!$('addOverlay').classList.contains('hidden')) closeAdd();
+    if (!$('noteOverlay').classList.contains('hidden')) closeNote();
   });
 
   $('detailSave').addEventListener('click', async function () {
@@ -529,6 +531,334 @@
     } finally {
       btn.disabled = false;
     }
+  });
+
+  // ─── Field notes ────────────────────────────────────────────────────────────
+  // Trip recaps for the public "From the Field" section. Entries live in the
+  // database; the public pages are static, so published changes appear after
+  // Netlify rebuilds the site (~1–2 minutes).
+
+  let notes = [];
+  let currentNote = null;
+  let noteTrigger = null;
+
+  function fmtTripDates(note) {
+    const opts = { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' };
+    const start = new Date(note.start_date).toLocaleDateString('en-US', opts);
+    if (!note.end_date || note.end_date === note.start_date) return start;
+    return start + ' – ' + new Date(note.end_date).toLocaleDateString('en-US', opts);
+  }
+
+  async function loadFieldNotes() {
+    notes = await api('/api/admin/field-notes');
+    renderFieldNotes();
+  }
+
+  function renderFieldNotes() {
+    const drafts = notes.filter((n) => n.status === 'draft').length;
+    $('noteCount').textContent = drafts || '';
+    $('noteEmpty').classList.toggle('hidden', notes.length > 0);
+
+    $('noteList').innerHTML = notes
+      .map(
+        (n) => `
+        <div class="contact-card note-card" data-id="${esc(n.id)}" tabindex="0">
+          <div class="contact-meta">
+            <span class="contact-name">${esc(n.title)}</span>
+            <span>${esc(fmtTripDates(n))} · ${n.photos.length} photo${n.photos.length === 1 ? '' : 's'}</span>
+          </div>
+          <div class="contact-actions">
+            <span class="status-badge status-${esc(n.status)}">${esc(n.status)}</span>
+            <button class="btn btn-outline btn-small" data-action="edit">Edit</button>
+          </div>
+        </div>`
+      )
+      .join('');
+
+    $('noteList')
+      .querySelectorAll('.note-card')
+      .forEach((card) => {
+        const open = () => openNote(card.dataset.id, card);
+        card.addEventListener('click', open);
+        card.addEventListener('keydown', function (e) {
+          if ((e.key === 'Enter' || e.key === ' ') && e.target === card) {
+            e.preventDefault();
+            open();
+          }
+        });
+      });
+  }
+
+  // ─── Field note editor modal ────────────────────────────────────────────────
+
+  function isoInputDate(value) {
+    return value ? String(value).slice(0, 10) : '';
+  }
+
+  function openNote(id, trigger) {
+    currentNote = id ? notes.find((n) => n.id === id) : null;
+    noteTrigger = trigger || document.activeElement;
+
+    $('noteForm').reset();
+    $('noteError').classList.add('hidden');
+    $('noteModalTitle').textContent = currentNote ? 'Edit Field Note' : 'New Field Note';
+    $('note-title').value = currentNote ? currentNote.title : '';
+    $('note-start').value = currentNote ? isoInputDate(currentNote.start_date) : '';
+    $('note-end').value = currentNote ? isoInputDate(currentNote.end_date) : '';
+    $('note-body').value = currentNote ? currentNote.body : '';
+
+    updateNoteControls();
+    renderPhotoStrip();
+    $('noteOverlay').classList.remove('hidden');
+    $('note-title').focus();
+  }
+
+  function closeNote() {
+    $('noteOverlay').classList.add('hidden');
+    currentNote = null;
+    if (noteTrigger && document.contains(noteTrigger)) noteTrigger.focus();
+    noteTrigger = null;
+  }
+
+  // Publish/Delete/photos only exist once the entry has been saved; the
+  // status line reminds authors that published changes wait on a rebuild.
+  function updateNoteControls() {
+    const saved = Boolean(currentNote);
+    const published = saved && currentNote.status === 'published';
+
+    $('notePhotos').classList.toggle('hidden', !saved);
+    $('notePhotoLocked').classList.toggle('hidden', saved);
+    $('notePublishBtn').classList.toggle('hidden', !saved);
+    $('noteDeleteBtn').classList.toggle('hidden', !saved);
+    $('notePublishBtn').textContent = published ? 'Unpublish' : 'Publish';
+    $('noteSaveBtn').textContent = published ? 'Save Changes' : 'Save Draft';
+
+    $('noteStatusLine').classList.toggle('hidden', !published);
+    $('noteStatusLine').textContent = published
+      ? 'Published — saved changes go live after the site rebuilds (~1–2 min).'
+      : '';
+  }
+
+  function noteFormPayload() {
+    return {
+      title: $('note-title').value.trim(),
+      start_date: $('note-start').value,
+      end_date: $('note-end').value || null,
+      body: $('note-body').value,
+    };
+  }
+
+  function showNoteError(message) {
+    $('noteError').textContent = message;
+    $('noteError').classList.remove('hidden');
+  }
+
+  async function saveNote(extra = {}) {
+    const payload = noteFormPayload();
+    if (!payload.title || !payload.start_date) {
+      showNoteError('A title and trip start date are required.');
+      return null;
+    }
+    $('noteError').classList.add('hidden');
+
+    if (currentNote) {
+      const result = await api('/api/admin/field-notes', {
+        method: 'PATCH',
+        body: JSON.stringify({ id: currentNote.id, ...payload, ...extra }),
+      });
+      await loadFieldNotes();
+      currentNote = notes.find((n) => n.id === currentNote.id);
+      return result;
+    }
+
+    const result = await api('/api/admin/field-notes', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    await loadFieldNotes();
+    currentNote = notes.find((n) => n.id === result.id);
+    return result;
+  }
+
+  $('noteForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const btn = $('noteSaveBtn');
+    btn.disabled = true;
+    try {
+      const result = await saveNote();
+      if (result) updateNoteControls();
+    } catch (err) {
+      showNoteError('Save failed: ' + err.message);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  $('notePublishBtn').addEventListener('click', async function () {
+    if (!currentNote) return;
+    const publishing = currentNote.status !== 'published';
+    if (!publishing && !confirm('Unpublish this entry? It will be removed from the public site after the next rebuild.')) {
+      return;
+    }
+    this.disabled = true;
+    try {
+      const result = await saveNote({ status: publishing ? 'published' : 'draft' });
+      if (result) updateNoteControls();
+    } catch (err) {
+      showNoteError((publishing ? 'Publish' : 'Unpublish') + ' failed: ' + err.message);
+    } finally {
+      this.disabled = false;
+    }
+  });
+
+  $('noteDeleteBtn').addEventListener('click', async function () {
+    if (!currentNote) return;
+    if (!confirm('Delete "' + currentNote.title + '" and its photos? This cannot be undone.')) return;
+    this.disabled = true;
+    try {
+      await api('/api/admin/field-notes', {
+        method: 'DELETE',
+        body: JSON.stringify({ id: currentNote.id }),
+      });
+      closeNote();
+      await loadFieldNotes();
+    } catch (err) {
+      showNoteError('Delete failed: ' + err.message);
+    } finally {
+      this.disabled = false;
+    }
+  });
+
+  $('newNoteBtn').addEventListener('click', () => openNote(null));
+  $('noteClose').addEventListener('click', closeNote);
+  $('noteCancelBtn').addEventListener('click', closeNote);
+  $('noteOverlay').addEventListener('click', function (e) {
+    if (e.target === this) closeNote();
+  });
+
+  // ─── Field note photos ──────────────────────────────────────────────────────
+
+  function renderPhotoStrip() {
+    const photos = currentNote ? currentNote.photos : [];
+    $('photoStrip').innerHTML = photos
+      .map(
+        (p) => `
+        <figure class="photo-thumb" data-id="${esc(p.id)}">
+          <img src="${esc(p.url)}" alt="${esc(p.alt)}">
+          <input type="text" value="${esc(p.alt)}" placeholder="Caption (optional)" data-field="alt" aria-label="Photo caption">
+          <div class="photo-thumb-actions">
+            <label class="photo-cover-label">
+              <input type="radio" name="cover-photo" data-field="cover" ${p.is_cover ? 'checked' : ''}> Cover
+            </label>
+            <button type="button" class="btn btn-danger btn-small" data-field="delete">Remove</button>
+          </div>
+        </figure>`
+      )
+      .join('');
+
+    $('photoStrip')
+      .querySelectorAll('.photo-thumb')
+      .forEach((thumb) => {
+        const id = thumb.dataset.id;
+        thumb.querySelector('[data-field="alt"]').addEventListener('change', async function () {
+          try {
+            await api('/api/admin/field-note-photos', {
+              method: 'PATCH',
+              body: JSON.stringify({ id, alt: this.value.trim() }),
+            });
+            await refreshCurrentNote();
+          } catch (err) {
+            showNoteError('Caption save failed: ' + err.message);
+          }
+        });
+        thumb.querySelector('[data-field="cover"]').addEventListener('change', async function () {
+          try {
+            await api('/api/admin/field-note-photos', {
+              method: 'PATCH',
+              body: JSON.stringify({ id, is_cover: true }),
+            });
+            await refreshCurrentNote();
+          } catch (err) {
+            showNoteError('Could not set cover photo: ' + err.message);
+          }
+        });
+        thumb.querySelector('[data-field="delete"]').addEventListener('click', async function () {
+          if (!confirm('Remove this photo?')) return;
+          try {
+            await api('/api/admin/field-note-photos', {
+              method: 'DELETE',
+              body: JSON.stringify({ id }),
+            });
+            await refreshCurrentNote();
+          } catch (err) {
+            showNoteError('Photo delete failed: ' + err.message);
+          }
+        });
+      });
+  }
+
+  async function refreshCurrentNote() {
+    const id = currentNote && currentNote.id;
+    await loadFieldNotes();
+    currentNote = notes.find((n) => n.id === id) || null;
+    renderPhotoStrip();
+  }
+
+  // Phones produce 4000px+/multi-MB photos; downscale on a canvas before
+  // upload so entries stay fast and well under the 5 MB server cap.
+  async function downscalePhoto(file, maxDim = 1600, quality = 0.85) {
+    if (file.size < 800 * 1024) {
+      const probe = await createImageBitmap(file);
+      const small = Math.max(probe.width, probe.height) <= maxDim;
+      probe.close();
+      if (small) return file;
+    }
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+    return new Promise((resolve, reject) => {
+      canvas.toBlob(
+        (blob) => (blob ? resolve(blob) : reject(new Error('Could not process image'))),
+        'image/jpeg',
+        quality
+      );
+    });
+  }
+
+  $('note-photo-input').addEventListener('change', async function () {
+    if (!currentNote) return;
+    const files = Array.from(this.files);
+    this.value = '';
+    $('noteError').classList.add('hidden');
+
+    for (let i = 0; i < files.length; i++) {
+      $('photoStatus').textContent = 'Uploading ' + (i + 1) + ' of ' + files.length + '…';
+      try {
+        const blob = await downscalePhoto(files[i]);
+        // Raw binary body — not JSON, so this bypasses the api() helper.
+        const res = await fetch(
+          '/api/admin/field-note-photos?note_id=' + encodeURIComponent(currentNote.id),
+          { method: 'POST', headers: { 'Content-Type': blob.type }, body: blob }
+        );
+        if (res.status === 401) {
+          showLogin();
+          return;
+        }
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error || 'Upload failed (' + res.status + ')');
+        }
+      } catch (err) {
+        showNoteError('"' + files[i].name + '" failed: ' + err.message);
+        break;
+      }
+    }
+    $('photoStatus').textContent = '';
+    await refreshCurrentNote();
   });
 
   // ─── Boot ───────────────────────────────────────────────────────────────────

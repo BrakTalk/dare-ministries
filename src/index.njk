@@ -2,48 +2,15 @@
 layout: false
 ---
 {% from "icons.njk" import icon %}
+{% from "head.njk" import head %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{{ site.title }} — Disaster Assistance and Relief Effort</title>
-  <meta name="description" content="{{ site.description }}">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700;900&family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/style.css">
+  {{ head(site.title + " — Disaster Assistance and Relief Effort", site.description) }}
 </head>
 <body>
 
-  <!-- Navigation -->
-  <nav class="navbar" id="navbar">
-    <div class="nav-container">
-      <a href="#home" class="nav-logo">
-        <span class="logo-dare">D.A.R.E.</span>
-        <span class="logo-sub">Ministries</span>
-      </a>
-      <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">
-        <span></span>
-        <span></span>
-        <span></span>
-      </button>
-      <ul class="nav-links" id="navLinks">
-        <li><a href="#home">Home</a></li>
-        <li><a href="#about">About</a></li>
-        <li><a href="#history">Our Story</a></li>
-        <li><a href="#impact">Our Impact</a></li>
-        <li><a href="#projects">Projects</a></li>
-        <li><a href="#gallery">Gallery</a></li>
-        <li><a href="#volunteer">Get Involved</a></li>
-        <li><a href="#donate" class="nav-donate">Donate</a></li>
-        <li><a href="#contact">Contact</a></li>
-        {% if collections.posts | length %}
-        <li><a href="#updates">Updates</a></li>
-        {% endif %}
-      </ul>
-    </div>
-  </nav>
+  {% include "navbar.njk" %}
 
   <!-- Hero Section -->
   <section class="hero" id="home">
@@ -254,30 +221,33 @@ layout: false
     </div>
   </section>
 
-  <!-- Blog/Updates Section -->
-  {% if collections.posts | length %}
+  <!-- From the Field Section -->
+  {% if fieldNotes.length %}
   <section class="section updates" id="updates">
     <div class="container">
       <div class="section-header">
-        <h2>Updates</h2>
+        <h2>From the Field</h2>
         <div class="section-divider"></div>
-        <p class="section-subtitle">News from the field</p>
+        <p class="section-subtitle">Recaps from our latest deployments</p>
       </div>
       <div class="posts-grid">
-        {% for post in collections.posts | reverse %}
+        {% for note in fieldNotes.slice(0, 3) %}
         <article class="post-card">
-          {% if post.data.image %}
-          <div class="post-image">
-            <img src="{{ post.data.image }}" alt="{{ post.data.title }}" loading="lazy">
-          </div>
+          {% if note.cover %}
+          <a href="/field-notes/{{ note.slug }}/" class="post-image">
+            <img src="{{ note.cover.url }}" alt="{{ note.cover.alt }}" loading="lazy">
+          </a>
           {% endif %}
           <div class="post-content">
-            <time class="post-date" datetime="{{ post.date | date('YYYY-MM-DD') }}">{{ post.date | date("MMMM D, YYYY") }}</time>
-            <h3>{{ post.data.title }}</h3>
-            <p>{{ post.data.summary | default(post.content | striptags | truncate(150)) }}</p>
+            <time class="post-date">{{ note.date_display }}</time>
+            <h3><a href="/field-notes/{{ note.slug }}/">{{ note.title }}</a></h3>
+            <p>{{ note.body | markdown | striptags | truncate(150) }}</p>
           </div>
         </article>
         {% endfor %}
+      </div>
+      <div class="projects-cta">
+        <a href="/field-notes/" class="btn btn-outline">Read All Field Notes</a>
       </div>
     </div>
   </section>
@@ -447,47 +417,7 @@ layout: false
     </div>
   </section>
 
-  <!-- Footer -->
-  <footer class="footer">
-    <div class="container">
-      <div class="footer-grid">
-        <div class="footer-about">
-          <div class="footer-logo">
-            <span class="logo-dare">D.A.R.E.</span>
-            <span class="logo-sub">Ministries</span>
-          </div>
-          <p>Disaster Assistance and Relief Effort</p>
-          <p class="footer-tagline">"{{ site.scripture }}"</p>
-        </div>
-        <div class="footer-links">
-          <h4>Quick Links</h4>
-          <ul>
-            <li><a href="#about">Our Mission</a></li>
-            <li><a href="#projects">Current Projects</a></li>
-            <li><a href="#volunteer">Volunteer</a></li>
-            <li><a href="#donate">Donate</a></li>
-            <li><a href="#contact">Contact</a></li>
-          </ul>
-        </div>
-        <div class="footer-contact">
-          <h4>Contact</h4>
-          <p>{{ site.contact.name }}</p>
-          <p><a href="mailto:{{ site.contact.email }}">{{ site.contact.email }}</a></p>
-          <p><a href="tel:+17063402221">{{ site.contact.phone }}</a></p>
-        </div>
-        <div class="footer-partners">
-          <h4>Partners</h4>
-          {% for partner in site.partners %}
-          <p>{{ partner }}</p>
-          {% endfor %}
-          <p class="footer-affiliation">{{ site.affiliation }}</p>
-        </div>
-      </div>
-      <div class="footer-bottom">
-        <p>&copy; {{ "now" | date("YYYY") }} D.A.R.E. Ministries &mdash; Disaster Assistance and Relief Effort. All rights reserved.</p>
-      </div>
-    </div>
-  </footer>
+  {% include "footer.njk" %}
 
   <script src="/js/main.js"></script>
   <script src="/js/forms.js" defer></script>

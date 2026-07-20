@@ -1,12 +1,16 @@
 require('dotenv').config();
 const { DateTime } = require('luxon');
+const markdownIt = require('markdown-it');
+
+// html: false — field note authors share one admin password, so raw HTML in
+// entry bodies must never reach the public site.
+const md = markdownIt({ html: false, linkify: true });
 
 module.exports = function (eleventyConfig) {
   // Pass through static assets
   eleventyConfig.addPassthroughCopy('src/css');
   eleventyConfig.addPassthroughCopy('src/js');
   eleventyConfig.addPassthroughCopy('src/images');
-  eleventyConfig.addPassthroughCopy('src/admin');
 
   // Date filters
   eleventyConfig.addFilter('date', function (dateObj, format) {
@@ -29,17 +33,15 @@ module.exports = function (eleventyConfig) {
     return str.replace(/<[^>]*>/g, '');
   });
 
+  // Render markdown (field note bodies) to HTML at build time
+  eleventyConfig.addFilter('markdown', function (str) {
+    return md.render(str || '');
+  });
+
   // Capitalize filter
   eleventyConfig.addFilter('capitalize', function (str) {
     if (!str) return '';
     return str.charAt(0).toUpperCase() + str.slice(1);
-  });
-
-  // Blog posts collection
-  eleventyConfig.addCollection('posts', function (collectionApi) {
-    return collectionApi.getFilteredByGlob('src/content/posts/*.md').sort(function (a, b) {
-      return a.date - b.date;
-    });
   });
 
   return {
