@@ -80,8 +80,9 @@ export default async (req) => {
       await db.sql`UPDATE field_note_photos SET sort_order = ${body.sort_order} WHERE id = ${body.id}`;
     }
     if (body.is_cover === true) {
-      await db.sql`UPDATE field_note_photos SET is_cover = FALSE WHERE note_id = ${photo.note_id}`;
-      await db.sql`UPDATE field_note_photos SET is_cover = TRUE WHERE id = ${body.id}`;
+      // Single statement so the swap is atomic — no window where the note has
+      // zero or two cover photos under concurrent requests.
+      await db.sql`UPDATE field_note_photos SET is_cover = (id = ${body.id}) WHERE note_id = ${photo.note_id}`;
     } else if (body.is_cover === false) {
       await db.sql`UPDATE field_note_photos SET is_cover = FALSE WHERE id = ${body.id}`;
     }
