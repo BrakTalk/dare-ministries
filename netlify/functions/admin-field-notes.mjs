@@ -4,7 +4,7 @@
 // triggers a rebuild via the BUILD_HOOK_URL hook.
 import { getDatabase } from '@netlify/database';
 import { getStore } from '@netlify/blobs';
-import { json, readBody, cleanText, triggerBuild, FIELD_PHOTOS_STORE } from './lib/helpers.mjs';
+import { json, readBody, cleanText, isUuid, triggerBuild, FIELD_PHOTOS_STORE } from './lib/helpers.mjs';
 import { requireAuth } from './lib/auth.mjs';
 
 export const config = { path: '/api/admin/field-notes' };
@@ -81,7 +81,7 @@ export default async (req) => {
 
   if (req.method === 'PATCH') {
     const body = await readBody(req);
-    if (!body?.id) return json({ error: 'id is required' }, 400);
+    if (!isUuid(body?.id)) return json({ error: 'A valid id is required' }, 400);
 
     const existing = (await db.sql`SELECT * FROM field_notes WHERE id = ${body.id}`)[0];
     if (!existing) return json({ error: 'Entry not found' }, 404);
@@ -139,7 +139,7 @@ export default async (req) => {
 
   if (req.method === 'DELETE') {
     const body = await readBody(req);
-    if (!body?.id) return json({ error: 'id is required' }, 400);
+    if (!isUuid(body?.id)) return json({ error: 'A valid id is required' }, 400);
 
     const existing = (await db.sql`SELECT * FROM field_notes WHERE id = ${body.id}`)[0];
     if (!existing) return json({ error: 'Entry not found' }, 404);

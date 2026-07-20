@@ -43,6 +43,15 @@ export async function triggerBuild() {
   }
 }
 
+// UUID guard for ids that flow into UUID columns / blob keys — reject
+// malformed values with a clean 400 instead of a database error.
+export function isUuid(value) {
+  return (
+    typeof value === 'string' &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
+  );
+}
+
 export function isValidEmail(email) {
   return typeof email === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }

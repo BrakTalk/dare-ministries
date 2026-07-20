@@ -6,7 +6,7 @@
 // metadata rows live in field_note_photos.
 import { getDatabase } from '@netlify/database';
 import { getStore } from '@netlify/blobs';
-import { json, readBody, cleanText, triggerBuild, FIELD_PHOTOS_STORE } from './lib/helpers.mjs';
+import { json, readBody, cleanText, isUuid, triggerBuild, FIELD_PHOTOS_STORE } from './lib/helpers.mjs';
 import { requireAuth } from './lib/auth.mjs';
 
 export const config = { path: '/api/admin/field-note-photos' };
@@ -31,7 +31,7 @@ export default async (req) => {
     const alt = cleanText(url.searchParams.get('alt'), 300);
     const contentType = (req.headers.get('content-type') || '').split(';')[0].trim();
 
-    if (!noteId) return json({ error: 'note_id is required' }, 400);
+    if (!isUuid(noteId)) return json({ error: 'A valid note_id is required' }, 400);
     if (!ALLOWED_TYPES.includes(contentType)) {
       return json({ error: 'Only JPEG, PNG, and WebP photos are supported' }, 415);
     }
@@ -68,7 +68,7 @@ export default async (req) => {
 
   if (req.method === 'PATCH') {
     const body = await readBody(req);
-    if (!body?.id) return json({ error: 'id is required' }, 400);
+    if (!isUuid(body?.id)) return json({ error: 'A valid id is required' }, 400);
 
     const photo = (await db.sql`SELECT * FROM field_note_photos WHERE id = ${body.id}`)[0];
     if (!photo) return json({ error: 'Photo not found' }, 404);
@@ -92,7 +92,7 @@ export default async (req) => {
 
   if (req.method === 'DELETE') {
     const body = await readBody(req);
-    if (!body?.id) return json({ error: 'id is required' }, 400);
+    if (!isUuid(body?.id)) return json({ error: 'A valid id is required' }, 400);
 
     const photo = (await db.sql`SELECT * FROM field_note_photos WHERE id = ${body.id}`)[0];
     if (!photo) return json({ error: 'Photo not found' }, 404);
