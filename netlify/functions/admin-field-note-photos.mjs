@@ -98,9 +98,11 @@ export default async (req) => {
     const photo = (await db.sql`SELECT * FROM field_note_photos WHERE id = ${body.id}`)[0];
     if (!photo) return json({ error: 'Photo not found' }, 404);
 
+    // Row first: if the blob delete then fails, the worst case is an unlisted
+    // orphaned blob — never a metadata row pointing at a missing image.
+    await db.sql`DELETE FROM field_note_photos WHERE id = ${body.id}`;
     const store = getStore(FIELD_PHOTOS_STORE);
     await store.delete(`${photo.note_id}/${photo.id}`);
-    await db.sql`DELETE FROM field_note_photos WHERE id = ${body.id}`;
 
     await rebuildIfPublished(db, photo.note_id);
     return json({ ok: true });
