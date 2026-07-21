@@ -46,6 +46,7 @@ eleventyExcludeFromCollections: true
       <button class="roster-tab active" data-tab="volunteers">Volunteers <span id="volunteerCount" class="tab-badge"></span></button>
       <button class="roster-tab" data-tab="contacts">Inbox <span id="unreadCount" class="tab-badge"></span></button>
       <button class="roster-tab" data-tab="stats">Impact Stats</button>
+      <button class="roster-tab" data-tab="field-notes">Field Notes <span id="noteCount" class="tab-badge"></span></button>
     </nav>
 
     <!-- Volunteers tab -->
@@ -108,6 +109,16 @@ eleventyExcludeFromCollections: true
         <button type="submit" class="btn btn-primary">Save Numbers</button>
         <span id="statsSaved" class="stats-saved hidden">Saved ✓</span>
       </form>
+    </section>
+
+    <!-- Field Notes tab -->
+    <section id="tab-field-notes" class="roster-panel hidden">
+      <div class="roster-toolbar">
+        <p class="roster-toolbar-hint">Trip recaps published to the "From the Field" section of the public site.</p>
+        <button id="newNoteBtn" class="btn btn-primary btn-small">New Entry</button>
+      </div>
+      <div class="roster-list" id="noteList"></div>
+      <p id="noteEmpty" class="roster-empty hidden">No field notes yet. Write the first trip recap!</p>
     </section>
   </main>
 
@@ -190,6 +201,53 @@ eleventyExcludeFromCollections: true
         <div class="modal-actions">
           <button type="submit" class="btn btn-primary">Add Volunteer</button>
           <button type="button" class="btn btn-outline" id="addCancel">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Field note editor modal -->
+  <div id="noteOverlay" class="roster-overlay hidden">
+    <div class="roster-modal roster-modal--wide" role="dialog" aria-modal="true" aria-labelledby="noteModalTitle">
+      <button class="modal-close" id="noteClose" aria-label="Close">&times;</button>
+      <h2 id="noteModalTitle">New Field Note</h2>
+      <form id="noteForm">
+        <div class="form-group">
+          <label for="note-title">Title *</label>
+          <input type="text" id="note-title" placeholder="e.g., Roswell UMC / DARE Trip to Augusta, GA" required>
+        </div>
+        <div class="note-dates">
+          <div class="form-group">
+            <label for="note-start">Trip Start *</label>
+            <input type="date" id="note-start" required>
+          </div>
+          <div class="form-group">
+            <label for="note-end">Trip End</label>
+            <input type="date" id="note-end">
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="note-body">Recap</label>
+          <textarea id="note-body" rows="14" placeholder="Write the trip recap here…"></textarea>
+          <p class="note-hint">Plain text works great. A blank line starts a new paragraph; **bold** makes text bold; * at the start of a line makes a bullet point.</p>
+        </div>
+
+        <div id="notePhotos" class="note-photos hidden">
+          <h3>Photos</h3>
+          <div id="photoStrip" class="photo-strip"></div>
+          <label for="note-photo-input" class="btn btn-outline btn-small">Add Photos</label>
+          <input type="file" id="note-photo-input" accept="image/jpeg,image/png,image/webp" multiple class="hidden">
+          <span id="photoStatus" class="photo-status"></span>
+        </div>
+        <p id="notePhotoLocked" class="note-hint">Save the entry first, then you can add photos.</p>
+
+        <p id="noteError" class="form-error hidden"></p>
+        <p id="noteStatusLine" class="note-status-line hidden"></p>
+        <div class="modal-actions">
+          <button type="submit" class="btn btn-primary" id="noteSaveBtn">Save Draft</button>
+          <button type="button" class="btn btn-primary hidden" id="notePublishBtn">Publish</button>
+          <button type="button" class="btn btn-danger hidden" id="noteDeleteBtn">Delete</button>
+          <button type="button" class="btn btn-outline" id="noteCancelBtn">Cancel</button>
         </div>
       </form>
     </div>

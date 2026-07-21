@@ -25,6 +25,33 @@ export function cleanText(value, maxLength) {
   return trimmed.slice(0, maxLength);
 }
 
+// Netlify Blobs store for field note photos. Baked into the upload, serve,
+// and delete paths — renaming it would orphan every existing photo.
+export const FIELD_PHOTOS_STORE = 'field-photos';
+
+// Asks Netlify to rebuild the static site (published field notes are baked in
+// at build time). Fire-and-forget: the DB write already succeeded, so a hook
+// failure only delays the site update — never fail the request over it.
+export async function triggerBuild() {
+  const url = process.env.BUILD_HOOK_URL;
+  if (!url) return;
+  try {
+    const res = await fetch(url, { method: 'POST' });
+    if (!res.ok) console.error('Build hook failed:', res.status);
+  } catch (err) {
+    console.error('Build hook failed:', err);
+  }
+}
+
+// UUID guard for ids that flow into UUID columns / blob keys — reject
+// malformed values with a clean 400 instead of a database error.
+export function isUuid(value) {
+  return (
+    typeof value === 'string' &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
+  );
+}
+
 export function isValidEmail(email) {
   return typeof email === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }

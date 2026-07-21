@@ -1,0 +1,65 @@
+---
+layout: false
+eleventyExcludeFromCollections: true
+pagination:
+  data: fieldNotes
+  size: 1
+  alias: note
+permalink: "/field-notes/{{ note.slug }}/index.html"
+---
+{% from "head.njk" import head %}
+{% set excerpt = note.body | markdown | striptags | truncate(160) %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {{ head(note.title + " — From the Field — " + site.title, excerpt) }}
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="{{ note.title }}">
+  <meta property="og:description" content="{{ excerpt }}">
+  <meta property="og:url" content="{{ site.url }}/field-notes/{{ note.slug }}/">
+  {% if note.cover %}
+  <meta property="og:image" content="{{ site.url }}{{ note.cover.url }}">
+  {% endif %}
+</head>
+<body>
+
+  {% include "navbar.njk" %}
+
+  <header class="page-hero">
+    <div class="container">
+      <p class="field-note-crumb"><a href="/field-notes/">&larr; From the Field</a></p>
+      <h1>{{ note.title }}</h1>
+      <time class="page-hero-subtitle">{{ note.date_display }}</time>
+    </div>
+  </header>
+
+  <article class="section field-note">
+    <div class="container">
+      <div class="field-note-body">
+        {{ note.body | markdown | safe }}
+      </div>
+
+      {% if note.photos.length %}
+      <div class="field-gallery">
+        {% for photo in note.photos %}
+        <figure class="field-gallery-item">
+          <img src="{{ photo.url }}" alt="{{ photo.alt }}" loading="lazy">
+          {% if photo.alt %}
+          <figcaption>{{ photo.alt }}</figcaption>
+          {% endif %}
+        </figure>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <div class="field-note-footer">
+        <a href="/field-notes/" class="btn btn-outline">&larr; All Field Notes</a>
+      </div>
+    </div>
+  </article>
+
+  {% include "footer.njk" %}
+
+  <script src="/js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,87 @@
+---
+layout: false
+permalink: /field-notes/index.html
+eleventyExcludeFromCollections: true
+---
+{% from "head.njk" import head %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {{ head("From the Field — " + site.title, "Trip recaps and stories from D.A.R.E. Ministries deployments across Georgia.") }}
+</head>
+<body>
+
+  {% include "navbar.njk" %}
+
+  <header class="page-hero">
+    <div class="container">
+      <h1>From the Field</h1>
+      <p class="page-hero-subtitle">Recaps and stories from our deployments</p>
+    </div>
+  </header>
+
+  {% if fieldNotes.length %}
+  {% set featured = fieldNotes[0] %}
+  <section class="section field-featured-section">
+    <div class="container">
+      <article class="field-featured">
+        {% if featured.cover %}
+        <a href="/field-notes/{{ featured.slug }}/" class="field-featured-image">
+          <img src="{{ featured.cover.url }}" alt="{{ featured.cover.alt }}">
+        </a>
+        {% endif %}
+        <div class="field-featured-content">
+          <span class="field-latest-badge">Latest Trip</span>
+          <time class="post-date">{{ featured.date_display }}</time>
+          <h2><a href="/field-notes/{{ featured.slug }}/">{{ featured.title }}</a></h2>
+          <p>{{ featured.body | markdown | striptags | truncate(300) }}</p>
+          <a href="/field-notes/{{ featured.slug }}/" class="btn btn-primary">Read the Full Recap</a>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  {% if fieldNotes.length > 1 %}
+  <section class="section field-archive">
+    <div class="container">
+      <div class="section-header">
+        <h2>Past Trips</h2>
+        <div class="section-divider"></div>
+      </div>
+      <div class="posts-grid">
+        {% for note in fieldNotes %}
+        {% if not loop.first %}
+        <article class="post-card">
+          {% if note.cover %}
+          <a href="/field-notes/{{ note.slug }}/" class="post-image">
+            <img src="{{ note.cover.url }}" alt="{{ note.cover.alt }}" loading="lazy">
+          </a>
+          {% endif %}
+          <div class="post-content">
+            <time class="post-date">{{ note.date_display }}</time>
+            <h3><a href="/field-notes/{{ note.slug }}/">{{ note.title }}</a></h3>
+            <p>{{ note.body | markdown | striptags | truncate(150) }}</p>
+          </div>
+        </article>
+        {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  {% else %}
+  <section class="section">
+    <div class="container">
+      <div class="field-empty">
+        <p>Stories from our deployments are coming soon. Check back after our next trip!</p>
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  {% include "footer.njk" %}
+
+  <script src="/js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,28 @@
+{# Shared top navigation. Links use /#anchor form so they work from any page;
+   on the homepage itself the browser treats them as in-page anchors. The
+   navbar/navToggle/navLinks ids are required by /js/main.js. #}
+<nav class="navbar" id="navbar">
+  <div class="nav-container">
+    <a href="/#home" class="nav-logo">
+      <span class="logo-dare">D.A.R.E.</span>
+      <span class="logo-sub">Ministries</span>
+    </a>
+    <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">
+      <span></span>
+      <span></span>
+      <span></span>
+    </button>
+    <ul class="nav-links" id="navLinks">
+      <li><a href="/#home">Home</a></li>
+      <li><a href="/#about">About</a></li>
+      <li><a href="/#history">Our Story</a></li>
+      <li><a href="/#impact">Our Impact</a></li>
+      <li><a href="/#projects">Projects</a></li>
+      <li><a href="/#gallery">Gallery</a></li>
+      <li><a href="/field-notes/">From the Field</a></li>
+      <li><a href="/#volunteer">Get Involved</a></li>
+      <li><a href="/#donate" class="nav-donate">Donate</a></li>
+      <li><a href="/#contact">Contact</a></li>
+    </ul>
+  </div>
+</nav>
