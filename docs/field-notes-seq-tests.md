@@ -327,7 +327,7 @@ Generated from the publish-flow sequence diagram (Admin → RosterConsole → Ad
 
 # Code review risk checklist
 
-- **Draft leakage:** any new public read path must repeat the `status = 'published'` filter; today `fieldNotes.js` is the only one (B8 pins it).
+- **Draft leakage:** every public read path must enforce the publication-status gate. Today there are two: `fieldNotes.js` (the `status = 'published'` SQL filter, pinned by B8) and `field-photo.mjs` (the row-join + status/session check, pinned by S5–S7). Any new public read path must add the equivalent check — and a test that pins it.
 - **Slug stability:** never regenerate a slug when `published_at IS NOT NULL` — shared links die (N10).
 - **Ordering bugs:** photo create is DB-first + rollback (P8); photo delete is DB-first, blob second (M3/M4). Reversing either reintroduces broken-image states. The DB row is the access-control source of truth for serving (S5–S7) — deleting it first also revokes public access immediately.
 - **Serving cache modes:** published responses are `immutable`; any authorized draft response must stay `private, no-store` — a `public` cache header on the draft path would leak drafts through the CDN.
