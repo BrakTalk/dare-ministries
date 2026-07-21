@@ -7,9 +7,9 @@ const markdownIt = require('markdown-it');
 const md = markdownIt({ html: false, linkify: true });
 
 module.exports = function (eleventyConfig) {
-  // Pass through static assets
+  // Pass through static assets (glob form so js/__tests__ never ships)
   eleventyConfig.addPassthroughCopy('src/css');
-  eleventyConfig.addPassthroughCopy('src/js');
+  eleventyConfig.addPassthroughCopy('src/js/*.js');
   eleventyConfig.addPassthroughCopy('src/images');
 
   // Date filters
