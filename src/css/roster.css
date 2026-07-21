@@ -530,3 +530,22 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* --- Toast --- */
+
+.toast {
+  position: fixed;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: min(90vw, 480px);
+  background: var(--color-success);
+  color: var(--color-white);
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 0.7rem 1.2rem;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  z-index: 300;
+  text-align: center;
+}

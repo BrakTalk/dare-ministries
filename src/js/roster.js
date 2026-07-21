@@ -50,6 +50,16 @@
     });
   }
 
+  let toastTimer = null;
+
+  function showToast(message) {
+    const el = $('toast');
+    el.textContent = message;
+    el.classList.remove('hidden');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.add('hidden'), 4000);
+  }
+
   // ─── Views ──────────────────────────────────────────────────────────────────
 
   function showLogin() {
@@ -683,13 +693,29 @@
     return result;
   }
 
+  // First save of a new entry keeps the modal open — it's what unlocks the
+  // photo section. Later saves close it and confirm with a toast.
   $('noteForm').addEventListener('submit', async function (e) {
     e.preventDefault();
     const btn = $('noteSaveBtn');
+    const isNew = !currentNote;
     btn.disabled = true;
     try {
       const result = await saveNote();
-      if (result) updateNoteControls();
+      if (result) {
+        if (isNew) {
+          updateNoteControls();
+          showToast('Draft saved — you can add photos now.');
+        } else {
+          const published = currentNote && currentNote.status === 'published';
+          closeNote();
+          showToast(
+            published
+              ? 'Saved — changes go live after the site rebuilds (~1–2 min).'
+              : 'Draft saved.'
+          );
+        }
+      }
     } catch (err) {
       showNoteError('Save failed: ' + err.message);
     } finally {
