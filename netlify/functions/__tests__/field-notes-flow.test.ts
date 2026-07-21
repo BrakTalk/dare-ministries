@@ -55,6 +55,7 @@ vi.mock('../lib/auth.mjs', () => ({
 import notesHandler from '../admin-field-notes.mjs';
 import photosHandler from '../admin-field-note-photos.mjs';
 import servePhotoHandler from '../field-photo.mjs';
+import feedHandler from '../field-notes-feed.mjs';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 import fieldNotesData from '../../../src/_data/fieldNotes.js';
 import eleventyInit from '../../../.eleventy.js';
@@ -153,8 +154,12 @@ beforeEach(() => {
 
   savedEnv.BUILD_HOOK_URL = process.env.BUILD_HOOK_URL;
   savedEnv.NETLIFY_DATABASE_URL = process.env.NETLIFY_DATABASE_URL;
+  savedEnv.NETLIFY = process.env.NETLIFY;
+  savedEnv.URL = process.env.URL;
   process.env.BUILD_HOOK_URL = 'https://hooks.netlify.test/build';
   delete process.env.NETLIFY_DATABASE_URL;
+  delete process.env.NETLIFY;
+  delete process.env.URL;
 
   hookFetch = vi.fn(async () => ({ ok: true, status: 200 }));
   vi.stubGlobal('fetch', hookFetch);
@@ -162,8 +167,10 @@ beforeEach(() => {
 
 afterEach(() => {
   process.env.BUILD_HOOK_URL = savedEnv.BUILD_HOOK_URL;
-  if (savedEnv.NETLIFY_DATABASE_URL === undefined) delete process.env.NETLIFY_DATABASE_URL;
-  else process.env.NETLIFY_DATABASE_URL = savedEnv.NETLIFY_DATABASE_URL;
+  for (const key of ['NETLIFY_DATABASE_URL', 'NETLIFY', 'URL'] as const) {
+    if (savedEnv[key] === undefined) delete process.env[key];
+    else process.env[key] = savedEnv[key];
+  }
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -577,11 +584,11 @@ describe('Phase: Build-time load (src/_data/fieldNotes.js)', () => {
     expect(notes[1].cover).toBeNull();
   });
 
-  it('⚠️ B3 missing NETLIFY_DATABASE_URL yields [] with a warning, no throw', async () => {
+  it('⚠️ B3 no database access at all (plain local dev) yields [] with a warning, no throw', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     delete process.env.NETLIFY_DATABASE_URL;
     await expect(fieldNotesData()).resolves.toEqual([]);
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('NETLIFY_DATABASE_URL'));
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('no database access'));
     expect(state.dbCalls).toHaveLength(0);
   });
 
@@ -617,6 +624,81 @@ describe('Phase: Build-time load (src/_data/fieldNotes.js)', () => {
     await fieldNotesData();
     const query = dbCall(/FROM field_notes/)!;
     expect(query.text).toContain("WHERE status = 'published'");
+  });
+
+  function netlifyBuildEnv() {
+    delete process.env.NETLIFY_DATABASE_URL;
+    process.env.NETLIFY = 'true';
+    process.env.URL = 'https://whofixedtheroof.com';
+  }
+
+  it('✅ B9 Netlify build without the DB env var falls back to the site feed', async () => {
+    netlifyBuildEnv();
+    const feedFetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        notes: [{ id: NOTE_ID, slug: 's', title: 'T', start_date: '2026-07-16', end_date: '2026-07-18', body: 'B', published_at: 'x' }],
+        photos: [{ id: PHOTO_ID, note_id: NOTE_ID, alt: 'Crew', is_cover: true }],
+      }),
+    }));
+    vi.stubGlobal('fetch', feedFetch);
+    const notes = await fieldNotesData();
+    expect(feedFetch).toHaveBeenCalledWith('https://whofixedtheroof.com/api/field-notes-feed');
+    expect(notes).toHaveLength(1);
+    expect(notes[0].cover.url).toBe(`/images/field/${NOTE_ID}/${PHOTO_ID}`);
+    expect(notes[0].date_display).toBe('July 16–18, 2026');
+    expect(state.dbCalls).toHaveLength(0);
+  });
+
+  it('⚠️ B10 a 404 from the feed (first deploy bootstrap) warns and builds empty', async () => {
+    netlifyBuildEnv();
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 404 })));
+    await expect(fieldNotesData()).resolves.toEqual([]);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('not found'));
+  });
+
+  it('❌ B11 any other feed failure fails the build (rejects)', async () => {
+    netlifyBuildEnv();
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 500 })));
+    await expect(fieldNotesData()).rejects.toThrow('feed fetch failed: 500');
+  });
+});
+
+// ─── Phase: Build feed function ──────────────────────────────────────────────
+
+describe('Phase: Build feed function (field-notes-feed)', () => {
+  const feedReq = (method = 'GET') =>
+    new Request('http://localhost/api/field-notes-feed', { method });
+
+  it("🔒 F1 serves published entries only, with the gate in the SQL and no-store caching", async () => {
+    onDb(/FROM field_notes WHERE status/, [
+      { id: NOTE_ID, slug: 's', title: 'T', start_date: '2026-07-16', end_date: null, body: 'B', published_at: 'x' },
+    ]);
+    onDb(/FROM field_note_photos WHERE note_id/, [
+      { id: PHOTO_ID, note_id: NOTE_ID, alt: 'Crew', is_cover: false },
+    ]);
+    const res = await feedHandler(feedReq());
+    expect(res.status).toBe(200);
+    expect(res.headers.get('Cache-Control')).toBe('no-store');
+    const body = await res.json();
+    expect(body.notes).toHaveLength(1);
+    expect(body.photos).toHaveLength(1);
+    expect(dbCall(/FROM field_notes/)!.text).toContain("WHERE status = 'published'");
+  });
+
+  it('⚠️ F2 zero published notes returns empty arrays without querying photos', async () => {
+    onDb(/FROM field_notes WHERE status/, []);
+    const res = await feedHandler(feedReq());
+    expect(await res.json()).toEqual({ notes: [], photos: [] });
+    expect(dbCall(/field_note_photos/)).toBeUndefined();
+  });
+
+  it('❌ F3 non-GET methods return 405', async () => {
+    const res = await feedHandler(feedReq('POST'));
+    expect(res.status).toBe(405);
+    expect(state.dbCalls).toHaveLength(0);
   });
 });
 
