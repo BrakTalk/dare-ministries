@@ -4,7 +4,8 @@
   "description": "D.A.R.E. Ministries — Disaster Aid Recovery and Effort",
   "scripts": {
     "build": "npx @11ty/eleventy",
-    "dev": "npx @11ty/eleventy --serve"
+    "dev": "npx @11ty/eleventy --serve",
+    "test": "vitest run"
   },
   "keywords": [],
   "author": "",
@@ -13,7 +14,8 @@
   "devDependencies": {
     "@11ty/eleventy": "^3.1.2",
     "dotenv": "^17.3.1",
-    "prettier": "^3.8.1"
+    "prettier": "^3.8.1",
+    "vitest": "^4.1.10"
   },
   "dependencies": {
     "@netlify/blobs": "^10.7.9",
