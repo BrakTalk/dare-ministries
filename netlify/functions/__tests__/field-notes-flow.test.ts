@@ -42,6 +42,7 @@ vi.mock('@netlify/blobs', () => ({
 }));
 
 vi.mock('../lib/auth.mjs', () => ({
+  isAuthenticated: () => state.authed,
   requireAuth: () =>
     state.authed
       ? null
@@ -624,7 +625,12 @@ describe('Phase: Build-time load (src/_data/fieldNotes.js)', () => {
 describe('Phase: Public photo serving (field-photo)', () => {
   const serveReq = new Request('http://localhost/images/field/x/y');
 
-  it('✅ S1 serves an existing blob with stored content type and immutable caching', async () => {
+  function stubPhotoRow(status: 'draft' | 'published') {
+    onDb(/FROM field_note_photos p JOIN field_notes n/, [{ status }]);
+  }
+
+  it('✅ S1 serves a published photo with stored content type and immutable caching', async () => {
+    stubPhotoRow('published');
     state.store!.getWithMetadata.mockResolvedValue({
       data: 'stream-stub',
       metadata: { contentType: 'image/png' },
@@ -636,24 +642,56 @@ describe('Phase: Public photo serving (field-photo)', () => {
     expect(state.store!.getWithMetadata).toHaveBeenCalledWith(`${NOTE_ID}/${PHOTO_ID}`, { type: 'stream' });
   });
 
-  it('🔒 S2 malformed path params return 404 without touching the store', async () => {
+  it('🔒 S2 malformed path params return 404 without touching the DB or store', async () => {
     const res = await servePhotoHandler(serveReq, {
       params: { noteId: '../secrets', photoId: PHOTO_ID },
     });
     expect(res.status).toBe(404);
+    expect(state.dbCalls).toHaveLength(0);
     expect(state.store!.getWithMetadata).not.toHaveBeenCalled();
   });
 
-  it('❌ S3 a missing blob returns 404', async () => {
+  it('❌ S3 a missing blob returns 404 even when the row exists', async () => {
+    stubPhotoRow('published');
     state.store!.getWithMetadata.mockResolvedValue(null);
     const res = await servePhotoHandler(serveReq, { params: { noteId: NOTE_ID, photoId: PHOTO_ID } });
     expect(res.status).toBe(404);
   });
 
   it('⚠️ S4 missing metadata falls back to image/jpeg', async () => {
+    stubPhotoRow('published');
     state.store!.getWithMetadata.mockResolvedValue({ data: 'stream-stub', metadata: null });
     const res = await servePhotoHandler(serveReq, { params: { noteId: NOTE_ID, photoId: PHOTO_ID } });
     expect(res.headers.get('Content-Type')).toBe('image/jpeg');
+  });
+
+  it('🔒 S5 a draft-note photo is not served to the public, even with valid UUIDs', async () => {
+    state.authed = false;
+    stubPhotoRow('draft');
+    state.store!.getWithMetadata.mockResolvedValue({ data: 'stream-stub', metadata: {} });
+    const res = await servePhotoHandler(serveReq, { params: { noteId: NOTE_ID, photoId: PHOTO_ID } });
+    expect(res.status).toBe(404);
+    expect(state.store!.getWithMetadata).not.toHaveBeenCalled();
+  });
+
+  it('🔒 S6 a draft-note photo is served to an admin session with no-store caching', async () => {
+    state.authed = true;
+    stubPhotoRow('draft');
+    state.store!.getWithMetadata.mockResolvedValue({
+      data: 'stream-stub',
+      metadata: { contentType: 'image/jpeg' },
+    });
+    const res = await servePhotoHandler(serveReq, { params: { noteId: NOTE_ID, photoId: PHOTO_ID } });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('Cache-Control')).toBe('private, no-store');
+  });
+
+  it('🔒 S7 an orphaned blob with no metadata row (deleted note) is never served', async () => {
+    // No DB route → the join returns no rows, as after M4's row-first delete.
+    state.store!.getWithMetadata.mockResolvedValue({ data: 'stream-stub', metadata: {} });
+    const res = await servePhotoHandler(serveReq, { params: { noteId: NOTE_ID, photoId: PHOTO_ID } });
+    expect(res.status).toBe(404);
+    expect(state.store!.getWithMetadata).not.toHaveBeenCalled();
   });
 });
 

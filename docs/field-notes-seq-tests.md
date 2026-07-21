@@ -22,7 +22,7 @@ Generated from the publish-flow sequence diagram (Admin → RosterConsole → Ad
 
 **External side effects:** Postgres rows, blobs, Netlify build-hook POSTs, static pages emitted at build.
 
-**Non-obvious contracts under test:** slug uniqueness with `-2` retry; `isUuid` guards before any query; 5 MB body cap under Netlify's ~6 MB limit; content-type allowlist; atomic cover swap (`SET is_cover = (id = X)` in one statement); build failure on DB error (never ship an empty archive over a populated one); markdown rendered with `html: false`.
+**Non-obvious contracts under test:** slug uniqueness with `-2` retry; `isUuid` guards before any query; 5 MB body cap under Netlify's ~6 MB limit; content-type allowlist; atomic cover swap (`SET is_cover = (id = X)` in one statement); build failure on DB error (never ship an empty archive over a populated one); markdown rendered with `html: false`; photo serving checks the metadata row and parent-note status — published photos are public/immutable, draft photos require an admin session (`no-store`), and orphaned blobs are never served.
 
 # Assumptions and ambiguities
 
@@ -31,8 +31,12 @@ Generated from the publish-flow sequence diagram (Admin → RosterConsole → Ad
 - **Ambiguity:** the diagram shows one "upload photo" arrow; the implementation also supports PATCH (caption/cover/order) and DELETE — treated as part of the photo phase.
 - **Ambiguity:** the diagram does not show public image serving; `field-photo.mjs` is the read path for generated pages, so it is included.
 - **Ambiguity:** concurrent editing of the same note by two admins is last-write-wins by design (no optimistic locking). Documented, not "fixed" by tests.
-- **Missing safeguard (accepted):** blob-delete failure after row delete leaves an invisible orphaned blob (M4 documents this as intended trade-off).
+- **Accepted trade-off:** blob-delete failure after row delete leaves an orphaned blob (M4). Orphans are *unserveable* — the serving function 404s any blob without a metadata row (S7) — so the residual cost is storage only. The one true residual exposure is CDN edge caches: a published photo cached `immutable` may keep serving from the edge for up to a year after unpublish/delete. Keys are unguessable double-UUIDs and content is destined-for-public trip photos, so this is accepted rather than engineered away (cache purging would require the Netlify API).
 - **Clarifying questions for developers:** should DELETE of a published note require a confirmation token? Should there be a public `GET /api/field-notes` (currently deliberately absent — see B8)?
+
+> **Revision note:** S1–S3 were updated and S5–S7 added after review feedback — the serving
+> function now enforces row-existence and note-status checks rather than relying on
+> unguessable URLs alone.
 
 # Test cases by phase
 
@@ -258,19 +262,37 @@ Generated from the publish-flow sequence diagram (Admin → RosterConsole → Ad
 
 ## Phase: Public photo serving (`field-photo.mjs`)
 
-### S1 - Existing blob → 200 with stored content type and immutable caching
+### S1 - Published photo → 200 with stored content type and immutable caching
 - Category: Happy path — P0 — Positive
+- Preconditions: metadata row exists, parent note `published`, blob present
 - Expected: 200; `Content-Type` from blob metadata; `Cache-Control: public, max-age=31536000, immutable`
 
-### S2 - Malformed UUID path params → 404 without touching the store
+### S2 - Malformed UUID path params → 404 without touching the DB or store
 - Category: Security — P0 — Security
 - Defect(s): key/path traversal via crafted params
 
-### S3 - Missing blob → 404
+### S3 - Missing blob (row exists) → 404
 - Category: Contract — P1 — Negative
 
 ### S4 - Missing metadata falls back to image/jpeg
 - Category: Resilience — P2 — Edge
+
+### S5 - Draft-note photo is not served to the public
+- Category: Security (draft leakage) — P0 — Security
+- Preconditions: row exists, parent note `draft`, no admin session
+- Expected: 404; blob store never queried
+- Defect(s): draft trip photos reachable at their public URL before publish
+
+### S6 - Draft-note photo is served to an admin session with no-store caching
+- Category: Contract — P0 — Positive
+- Preconditions: valid admin session cookie
+- Expected: 200; `Cache-Control: private, no-store` (the roster console previews draft thumbnails through this route; the CDN must never cache the authorized response for public reuse)
+
+### S7 - Orphaned blob (no metadata row) is never served
+- Category: Security / cleanup — P0 — Security
+- Preconditions: blob exists, row deleted (M4's accepted failure mode, or a deleted note)
+- Expected: 404; blob store never queried
+- Defect(s): deleted notes' photos living on at their old URLs
 
 ## Phase: Markdown rendering gate (`.eleventy.js` `markdown` filter)
 
@@ -289,6 +311,7 @@ Generated from the publish-flow sequence diagram (Admin → RosterConsole → Ad
 
 - N21 / P12: auth-first on every admin method, zero side effects when rejected.
 - N13 / P6 / S2: UUID guards before persistence on every id-bearing input.
+- S5 / S6 / S7: photo access control — published = public, draft = admin-only (`no-store`), orphan = 404. URL unguessability is defense-in-depth, not the gate.
 - M1: single-statement cover swap (race-free by construction).
 - N22: build hook is fire-and-forget — hook outage degrades to "publish delayed", never "publish failed".
 - B4 vs B3: asymmetric failure policy (missing env = benign local dev → `[]`; DB error in CI/deploy = fail the build) asserted separately.
@@ -304,7 +327,8 @@ Generated from the publish-flow sequence diagram (Admin → RosterConsole → Ad
 
 - **Draft leakage:** any new public read path must repeat the `status = 'published'` filter; today `fieldNotes.js` is the only one (B8 pins it).
 - **Slug stability:** never regenerate a slug when `published_at IS NOT NULL` — shared links die (N10).
-- **Ordering bugs:** photo create is DB-first + rollback (P8); photo delete is DB-first, blob second (M3/M4). Reversing either reintroduces broken-image states.
+- **Ordering bugs:** photo create is DB-first + rollback (P8); photo delete is DB-first, blob second (M3/M4). Reversing either reintroduces broken-image states. The DB row is the access-control source of truth for serving (S5–S7) — deleting it first also revokes public access immediately.
+- **Serving cache modes:** published responses are `immutable`; any authorized draft response must stay `private, no-store` — a `public` cache header on the draft path would leak drafts through the CDN.
 - **Hook scoping:** `triggerBuild()` only when the mutation is publicly visible (N15/N18/P9) — otherwise every draft keystroke burns a Netlify build.
 - **Body limits:** keep the 5 MB cap under Netlify's ~6 MB function limit (P5); client downscaling is an optimization, not the guard.
 - **`src/images/field/` must never exist** — the Eleventy passthrough copy would shadow the image-serving function route.
