@@ -132,10 +132,26 @@ async function flush() {
   for (let i = 0; i < 25; i++) await Promise.resolve();
 }
 
+// roster.js registers a document-level keydown listener each time it boots;
+// track what each boot adds so afterEach can strip it and handlers never
+// stack across tests on the shared document.
+const docListeners: Array<Parameters<Document['addEventListener']>> = [];
+
 async function boot(seed: NoteRecord[] = []) {
   notesDb = seed;
   document.body.innerHTML = rosterMarkup;
-  new Function(rosterSource)();
+  const nativeAdd = document.addEventListener.bind(document);
+  const addSpy = vi
+    .spyOn(document, 'addEventListener')
+    .mockImplementation((...args: Parameters<Document['addEventListener']>) => {
+      docListeners.push(args);
+      nativeAdd(...args);
+    });
+  try {
+    new Function(rosterSource)();
+  } finally {
+    addSpy.mockRestore();
+  }
   await flush();
 }
 
@@ -188,6 +204,10 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  for (const [type, listener, options] of docListeners) {
+    document.removeEventListener(type, listener, options);
+  }
+  docListeners.length = 0;
   vi.useRealTimers();
   vi.unstubAllGlobals();
 });
