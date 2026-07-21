@@ -376,6 +376,30 @@
   margin-top: 1.25rem;
 }
 
+/* style.css designs .btn-outline for the navy hero (white on dark); on the
+   console's light surfaces that renders nearly invisible. Repaint it navy,
+   except in the dark page header where the original styling is correct. */
+.roster-body .btn-outline {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.roster-body .btn-outline:hover {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-white);
+}
+
+.roster-header .btn-outline {
+  color: var(--color-white);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.roster-header .btn-outline:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--color-white);
+}
+
 .btn-danger {
   background: var(--color-danger);
   color: var(--color-white);
@@ -431,7 +455,11 @@
   cursor: pointer;
 }
 
+/* Unlike inbox cards, note cards always show their status badge and Edit
+   button — the .open reveal only applies to contact messages. */
 .note-card .contact-actions {
+  display: flex;
+  margin-top: 0;
   align-items: center;
 }
 
