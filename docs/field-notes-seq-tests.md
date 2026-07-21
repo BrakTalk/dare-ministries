@@ -258,7 +258,33 @@ Generated from the publish-flow sequence diagram (Admin → RosterConsole → Ad
 
 ### B8 - The published filter lives in the SQL, not post-filtering
 - Category: Security contract — P0 — Security
-- Expected: the executed query text contains `status = 'published'` — the single draft-leakage gate asserted directly
+- Expected: the executed query text contains `status = 'published'` — the draft-leakage gate asserted directly
+
+### B9 - Netlify build without the DB env var falls back to the site feed
+- Category: Resilience / platform gap — P0 — Positive
+- Preconditions: `NETLIFY=true`, `URL` set, no `NETLIFY_DATABASE_URL` (Netlify's built-in Database injects the connection string into the functions runtime only, never into builds)
+- Expected: fetches `${URL}/api/field-notes-feed`, shapes notes/photos/cover/date_display identically to the direct-DB path; no DB calls
+
+### B10 - Feed 404 (bootstrap) warns and builds empty
+- Category: Deploy ordering — P1 — Edge
+- Preconditions: the live site predates the feed function (the build fetches the *previous* deploy's functions)
+- Expected: `[]` with a warning — a throw here would deadlock the first deploy of the feed itself
+
+### B11 - Any other feed failure fails the build
+- Category: Resilience — P0 — Negative
+- Expected: non-404 error → reject → deploy fails → previous good archive stays live
+
+## Phase: Build feed function (`field-notes-feed.mjs`)
+
+### F1 - Serves published entries only, gate in the SQL, no-store caching
+- Category: Security contract — P0 — Security
+- Expected: 200 `{notes, photos}`; query text contains `status = 'published'`; `Cache-Control: no-store` (the build fetches moments after a publish — a cached response would bake stale content into the new deploy)
+
+### F2 - Zero published notes → empty arrays, no photo query
+- Category: Efficiency — P2 — Edge
+
+### F3 - Non-GET methods → 405
+- Category: Contract — P2 — Negative
 
 ## Phase: Public photo serving (`field-photo.mjs`)
 
@@ -327,7 +353,7 @@ Generated from the publish-flow sequence diagram (Admin → RosterConsole → Ad
 
 # Code review risk checklist
 
-- **Draft leakage:** every public read path must enforce the publication-status gate. Today there are two: `fieldNotes.js` (the `status = 'published'` SQL filter, pinned by B8) and `field-photo.mjs` (the row-join + status/session check, pinned by S5–S7). Any new public read path must add the equivalent check — and a test that pins it.
+- **Draft leakage:** every public read path must enforce the publication-status gate. Today there are three: `fieldNotes.js` (the `status = 'published'` SQL filter, pinned by B8), `field-photo.mjs` (the row-join + status/session check, pinned by S5–S7), and `field-notes-feed.mjs` (the published-only SQL filter, pinned by F1). Any new public read path must add the equivalent check — and a test that pins it.
 - **Slug stability:** never regenerate a slug when `published_at IS NOT NULL` — shared links die (N10).
 - **Ordering bugs:** photo create is DB-first + rollback (P8); photo delete is DB-first, blob second (M3/M4). Reversing either reintroduces broken-image states. The DB row is the access-control source of truth for serving (S5–S7) — deleting it first also revokes public access immediately.
 - **Serving cache modes:** published responses are `immutable`; any authorized draft response must stay `private, no-store` — a `public` cache header on the draft path would leak drafts through the CDN.
