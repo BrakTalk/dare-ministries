@@ -658,7 +658,7 @@ describe('Phase: Public photo serving (field-photo)', () => {
     expect(res.status).toBe(404);
   });
 
-  it('⚠️ S4 missing metadata falls back to image/jpeg', async () => {
+  it('⚠️ S4 missing blob metadata falls back to image/jpeg (row present and published)', async () => {
     stubPhotoRow('published');
     state.store!.getWithMetadata.mockResolvedValue({ data: 'stream-stub', metadata: null });
     const res = await servePhotoHandler(serveReq, { params: { noteId: NOTE_ID, photoId: PHOTO_ID } });

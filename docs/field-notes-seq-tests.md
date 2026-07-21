@@ -274,8 +274,10 @@ Generated from the publish-flow sequence diagram (Admin → RosterConsole → Ad
 ### S3 - Missing blob (row exists) → 404
 - Category: Contract — P1 — Negative
 
-### S4 - Missing metadata falls back to image/jpeg
+### S4 - Missing blob metadata falls back to image/jpeg (row present and published)
 - Category: Resilience — P2 — Edge
+- Preconditions: metadata **row exists** and parent note is published; only the blob's stored `contentType` metadata is absent
+- Expected: 200 with `Content-Type: image/jpeg`. This fallback applies solely to the blob-metadata field — a missing **database row** is always a 404 (S7) and must never fall through to this path
 
 ### S5 - Draft-note photo is not served to the public
 - Category: Security (draft leakage) — P0 — Security
