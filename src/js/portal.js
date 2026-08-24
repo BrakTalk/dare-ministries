@@ -173,9 +173,16 @@ $('portalProfileForm').addEventListener('submit', async (event) => {
 });
 
 function escapeHtml(value) {
-  const element = document.createElement('div');
-  element.textContent = value == null ? '' : String(value);
-  return element.innerHTML;
+  const entities = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  };
+  return (value == null ? '' : String(value)).replace(/[&<>"']/g, (character) => {
+    return entities[character];
+  });
 }
 
 function formatDate(value) {
