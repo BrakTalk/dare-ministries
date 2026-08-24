@@ -1,0 +1,81 @@
+---
+layout: false
+permalink: /login/index.html
+eleventyExcludeFromCollections: true
+---
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Sign In | D.A.R.E. Volunteer Portal</title>
+    <meta
+      name="description"
+      content="Sign in to the private D.A.R.E. Ministries Volunteer Portal."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700;900&family=Open+Sans:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/css/style.css" />
+    <link rel="stylesheet" href="/css/portal.css" />
+  </head>
+  <body class="account-body">
+    <header class="account-header">
+      <a href="/" class="nav-logo" aria-label="D.A.R.E. Ministries home">
+        <span class="logo-dare">D.A.R.E.</span>
+        <span class="logo-sub">Volunteer Portal</span>
+      </a>
+      <div class="account-header-actions">
+        <a href="/" class="btn btn-outline btn-small">Public Website</a>
+      </div>
+    </header>
+
+    <main class="account-main">
+      <div class="account-layout">
+        <section class="account-intro" aria-labelledby="login-heading">
+          <p class="account-eyebrow">Volunteer Portal</p>
+          <h1 id="login-heading">Welcome back</h1>
+          <p>
+            Sign in to view your account status, update your profile, and use the private tools that
+            have been approved for you.
+          </p>
+        </section>
+
+        <section class="account-card" aria-labelledby="login-form-heading">
+          <h2 id="login-form-heading">Sign in</h2>
+          <p>Use the email address and password connected to your account.</p>
+          <form id="loginForm" class="account-form">
+            <div class="form-group">
+              <label for="loginEmail">Email address</label>
+              <input type="email" id="loginEmail" name="email" autocomplete="email" required />
+            </div>
+            <div class="form-group">
+              <label for="loginPassword">Password</label>
+              <input
+                type="password"
+                id="loginPassword"
+                name="password"
+                autocomplete="current-password"
+                required
+              />
+            </div>
+            <p id="accountStatus" class="account-status" role="status" aria-live="polite"></p>
+            <button type="submit" class="btn btn-primary btn-full">Sign In</button>
+          </form>
+          <div class="account-links">
+            <p><a href="/forgot-password/">Forgot your password?</a></p>
+            <p>New to the portal? <a href="/register/">Create an account</a></p>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    {% include "identity-importmap.njk" %}
+    <script type="module" src="/js/auth-client.js"></script>
+  </body>
+</html>

@@ -198,6 +198,17 @@ h4 {
   background: var(--color-accent-dark) !important;
 }
 
+.nav-portal {
+  border: 1px solid rgba(255, 255, 255, 0.56);
+  color: var(--color-white) !important;
+}
+
+.nav-portal:hover {
+  border-color: var(--color-white);
+  background: var(--color-white) !important;
+  color: var(--color-primary) !important;
+}
+
 .nav-toggle {
   display: none;
   flex-direction: column;
