@@ -15,11 +15,11 @@ export function identityIsCoordinator(user) {
   );
 }
 
-function metadataText(user, key, maxLength) {
+export function metadataText(user, key, maxLength) {
   return cleanText(user?.userMetadata?.[key], maxLength);
 }
 
-function fallbackName(user) {
+export function fallbackName(user) {
   return (
     metadataText(user, 'full_name', 200) ||
     metadataText(user, 'name', 200) ||

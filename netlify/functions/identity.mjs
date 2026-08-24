@@ -3,19 +3,7 @@
 
 import { getDatabase } from '@netlify/database';
 import { cleanText, notify } from './lib/helpers.mjs';
-
-function metadataText(user, key, maxLength) {
-  return cleanText(user?.userMetadata?.[key], maxLength);
-}
-
-function displayName(user) {
-  return (
-    metadataText(user, 'full_name', 200) ||
-    metadataText(user, 'name', 200) ||
-    cleanText(user?.email?.split('@')[0], 200) ||
-    'Portal member'
-  );
-}
+import { fallbackName, metadataText } from './lib/portal-auth.mjs';
 
 export default {
   async userSignup(event) {
@@ -37,7 +25,7 @@ export default {
         VALUES (
           ${user.id},
           ${email.toLowerCase()},
-          ${displayName(user)},
+          ${fallbackName(user)},
           ${metadataText(user, 'phone', 50)},
           ${metadataText(user, 'organization', 200)},
           ${metadataText(user, 'request_reason', 2000)}
@@ -53,9 +41,9 @@ export default {
     }
 
     await notify(
-      `Portal access request: ${displayName(user)}`,
+      `Portal access request: ${fallbackName(user)}`,
       [
-        `${displayName(user)} has confirmed their email and requested access to the D.A.R.E. Volunteer Portal.`,
+        `${fallbackName(user)} has confirmed their email and requested access to the D.A.R.E. Volunteer Portal.`,
         '',
         `Email: ${email}`,
         `Phone: ${metadataText(user, 'phone', 50) || 'Not provided'}`,

@@ -2,8 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { NetlifyDB } from '@netlify/database-dev';
 import {
+  fallbackName,
   identityIsCoordinator,
   isUuid,
+  metadataText,
   publicProfile,
 } from '../netlify/functions/lib/portal-auth.mjs';
 import { mergePortalIdentityRoles } from '../netlify/functions/admin-user-profiles.mjs';
@@ -16,6 +18,16 @@ test('portal authorization helpers recognize only coordinator roles', () => {
   assert.equal(identityIsCoordinator({ role: 'admin' }), true);
   assert.equal(identityIsCoordinator({ roles: ['administrator'] }), false);
   assert.equal(identityIsCoordinator({}), false);
+});
+
+test('Identity profile helpers share metadata and fallback rules', () => {
+  const user = {
+    email: 'person@example.com',
+    userMetadata: { full_name: '  Person Name  ', phone: '  555-0100  ' },
+  };
+  assert.equal(fallbackName(user), 'Person Name');
+  assert.equal(metadataText(user, 'phone', 50), '555-0100');
+  assert.equal(fallbackName({ email: 'fallback@example.com' }), 'fallback');
 });
 
 test('portal role synchronization preserves unrelated Identity roles', () => {
