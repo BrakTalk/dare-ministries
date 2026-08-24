@@ -23,28 +23,34 @@ export default {
     const email = cleanText(user.email, 320);
     if (!email) return;
 
-    const db = getDatabase();
-    await db.sql`
-      INSERT INTO user_profiles (
-        identity_user_id,
-        email,
-        display_name,
-        phone,
-        organization,
-        request_reason
-      )
-      VALUES (
-        ${user.id},
-        ${email.toLowerCase()},
-        ${displayName(user)},
-        ${metadataText(user, 'phone', 50)},
-        ${metadataText(user, 'organization', 200)},
-        ${metadataText(user, 'request_reason', 2000)}
-      )
-      ON CONFLICT (identity_user_id) DO UPDATE SET
-        email = EXCLUDED.email,
-        updated_at = NOW()
-    `;
+    try {
+      const db = getDatabase();
+      await db.sql`
+        INSERT INTO user_profiles (
+          identity_user_id,
+          email,
+          display_name,
+          phone,
+          organization,
+          request_reason
+        )
+        VALUES (
+          ${user.id},
+          ${email.toLowerCase()},
+          ${displayName(user)},
+          ${metadataText(user, 'phone', 50)},
+          ${metadataText(user, 'organization', 200)},
+          ${metadataText(user, 'request_reason', 2000)}
+        )
+        ON CONFLICT (identity_user_id) DO UPDATE SET
+          email = EXCLUDED.email,
+          updated_at = NOW()
+      `;
+    } catch (err) {
+      // The profile is provisioned again on first sign-in, so a temporary
+      // database failure here must not prevent the Identity signup.
+      console.error('Could not pre-create portal profile at signup:', err);
+    }
 
     await notify(
       `Portal access request: ${displayName(user)}`,
