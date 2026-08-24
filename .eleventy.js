@@ -11,6 +11,13 @@ module.exports = function (eleventyConfig) {
   eleventyConfig.addPassthroughCopy('src/css');
   eleventyConfig.addPassthroughCopy('src/js/*.js');
   eleventyConfig.addPassthroughCopy('src/images');
+  // Browser-ready modules used by the custom Volunteer Portal account screens.
+  // Netlify Identity's ESM build imports gotrue-js by package name, so both
+  // modules are copied and resolved through an import map.
+  eleventyConfig.addPassthroughCopy({
+    'node_modules/@netlify/identity/dist/main.js': 'js/vendor/netlify-identity.js',
+    'node_modules/gotrue-js/lib/index.js': 'js/vendor/gotrue.js',
+  });
 
   // Date filters
   eleventyConfig.addFilter('date', function (dateObj, format) {

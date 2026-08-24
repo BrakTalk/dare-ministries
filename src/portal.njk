@@ -1,0 +1,218 @@
+---
+layout: false
+permalink: /portal/index.html
+eleventyExcludeFromCollections: true
+---
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Volunteer Portal | D.A.R.E. Ministries</title>
+    <meta
+      name="description"
+      content="Private volunteer and ministry coordinator resources for D.A.R.E. Ministries."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700;900&family=Open+Sans:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/css/style.css" />
+    <link rel="stylesheet" href="/css/portal.css" />
+  </head>
+  <body class="portal-body">
+    <header class="portal-header">
+      <div class="portal-header-actions">
+        <button
+          id="portalMenuToggle"
+          class="portal-menu-toggle"
+          type="button"
+          aria-controls="portalSidebar"
+          aria-expanded="false"
+        >
+          Menu
+        </button>
+        <a href="/" class="nav-logo" aria-label="D.A.R.E. Ministries public website">
+          <span class="logo-dare">D.A.R.E.</span>
+          <span class="logo-sub">Volunteer Portal</span>
+        </a>
+      </div>
+      <div class="portal-header-actions">
+        <span id="headerMemberName" class="header-member-name" aria-live="polite"></span>
+        <button id="portalLogout" type="button" class="btn btn-outline btn-small">Sign Out</button>
+      </div>
+    </header>
+
+    <div id="portalLoading" class="portal-loading" role="status">Loading your account...</div>
+
+    <div id="portalShell" class="portal-shell hidden">
+      <aside id="portalSidebar" class="portal-sidebar" aria-label="Volunteer Portal navigation">
+        <div class="portal-member">
+          <strong id="sidebarMemberName">Portal member</strong>
+          <span id="sidebarMemberEmail"></span>
+        </div>
+
+        <p class="portal-nav-label">My portal</p>
+        <nav class="portal-nav">
+          <button type="button" class="active" data-portal-view="dashboard">Dashboard</button>
+          <button type="button" data-portal-view="profile">My Profile</button>
+        </nav>
+
+        <div id="coordinatorNavigation" class="hidden">
+          <p class="portal-nav-label">Coordination</p>
+          <nav class="portal-nav">
+            <button type="button" data-portal-view="access">
+              Account Requests <span id="pendingBadge"></span>
+            </button>
+            <a href="/roster/">Roster Console</a>
+          </nav>
+        </div>
+      </aside>
+      <button
+        id="portalBackdrop"
+        class="portal-backdrop"
+        type="button"
+        aria-label="Close navigation"
+      ></button>
+
+      <main class="portal-main" tabindex="-1">
+        <section id="portalViewDashboard" class="portal-view" data-view="dashboard">
+          <header class="portal-view-header">
+            <p class="portal-eyebrow">Volunteer Portal</p>
+            <h1>Welcome, <span id="dashboardMemberName">friend</span></h1>
+            <p>Your private D.A.R.E. account and ministry resources live here.</p>
+          </header>
+
+          <div class="portal-grid">
+            <article class="portal-card full">
+              <span id="accountStatusPill" class="portal-status-pill">Loading</span>
+              <h2 id="accountStatusHeading">Checking your access</h2>
+              <p id="accountStatusMessage">Please wait while the portal checks your account.</p>
+              <p id="accountDecisionMessage" class="portal-notice warning hidden"></p>
+            </article>
+
+            <article class="portal-card">
+              <h2>Your profile</h2>
+              <p>
+                Keep your name, phone number, organization, and connection to D.A.R.E. up to date.
+              </p>
+              <div class="portal-card-actions">
+                <button type="button" class="btn btn-primary btn-small" data-portal-view="profile">
+                  Review Profile
+                </button>
+              </div>
+            </article>
+
+            <article id="memberToolsCard" class="portal-card">
+              <h2>Portal tools</h2>
+              <p id="memberToolsMessage">
+                Additional volunteer tools will appear here as they are planned and approved.
+              </p>
+            </article>
+
+            <article id="coordinatorDashboardCard" class="portal-card full hidden">
+              <h2>Coordinator overview</h2>
+              <p>
+                <strong id="pendingDashboardCount">0</strong> account request<span
+                  id="pendingDashboardPlural"
+                  >s</span
+                >
+                waiting for review.
+              </p>
+              <div class="portal-card-actions">
+                <button type="button" class="btn btn-primary btn-small" data-portal-view="access">
+                  Review Accounts
+                </button>
+                <a href="/roster/" class="btn btn-outline btn-small">Open Roster Console</a>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section id="portalViewProfile" class="portal-view" data-view="profile" hidden>
+          <header class="portal-view-header">
+            <p class="portal-eyebrow">My account</p>
+            <h1>Profile</h1>
+            <p>
+              These details help ministry coordinators recognize you and understand your connection
+              to D.A.R.E.
+            </p>
+          </header>
+
+          <article class="portal-card full">
+            <form id="portalProfileForm" class="portal-form">
+              <div class="portal-form-grid">
+                <div class="form-group">
+                  <label for="profileName">Full name</label>
+                  <input
+                    type="text"
+                    id="profileName"
+                    maxlength="200"
+                    autocomplete="name"
+                    required
+                  />
+                </div>
+                <div class="form-group">
+                  <label for="profileEmail">Email address</label>
+                  <input
+                    type="email"
+                    id="profileEmail"
+                    readonly
+                    aria-describedby="profileEmailHelp"
+                  />
+                  <p id="profileEmailHelp" class="account-form-help">
+                    Your sign-in email is managed through your account.
+                  </p>
+                </div>
+                <div class="form-group">
+                  <label for="profilePhone">Phone number</label>
+                  <input type="tel" id="profilePhone" maxlength="50" autocomplete="tel" />
+                </div>
+                <div class="form-group">
+                  <label for="profileOrganization">Church or organization</label>
+                  <input
+                    type="text"
+                    id="profileOrganization"
+                    maxlength="200"
+                    autocomplete="organization"
+                  />
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="profileReason">How are you connected to D.A.R.E.?</label>
+                <textarea id="profileReason" rows="5" maxlength="2000"></textarea>
+              </div>
+              <p id="profileStatus" class="account-status" role="status" aria-live="polite"></p>
+              <div>
+                <button type="submit" class="btn btn-primary">Save Profile</button>
+              </div>
+            </form>
+          </article>
+        </section>
+
+        <section id="portalViewAccess" class="portal-view" data-view="access" hidden>
+          <header class="portal-view-header">
+            <p class="portal-eyebrow">Coordination</p>
+            <h1>Account requests</h1>
+            <p>
+              Review who is asking to use the private portal. Approval gives the person member
+              access.
+            </p>
+          </header>
+
+          <p id="accountReviewStatus" class="account-status" role="status" aria-live="polite"></p>
+          <div id="portalAccountList" class="portal-account-list" aria-live="polite">
+            <p class="portal-empty">Loading account requests...</p>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    {% include "identity-importmap.njk" %}
+    <script type="module" src="/js/portal.js"></script>
+  </body>
+</html>

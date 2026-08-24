@@ -59,10 +59,15 @@ export function isValidEmail(email) {
 // Sends a notification email via Resend when RESEND_API_KEY and NOTIFY_EMAIL
 // are configured. A notification failure never fails the submission itself —
 // the row is already safely in the database.
+export const NOTIFY_TIMEOUT_MS = 5000;
+
 export async function notify(subject, text) {
   const apiKey = process.env.RESEND_API_KEY;
   const to = process.env.NOTIFY_EMAIL;
   if (!apiKey || !to) return;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), NOTIFY_TIMEOUT_MS);
 
   try {
     const res = await fetch('https://api.resend.com/emails', {
@@ -77,11 +82,17 @@ export async function notify(subject, text) {
         subject,
         text,
       }),
+      signal: controller.signal,
     });
     if (!res.ok) {
       console.error('Notification email failed:', res.status, await res.text());
     }
   } catch (err) {
-    console.error('Notification email failed:', err);
+    console.error(
+      controller.signal.aborted ? 'Notification email timed out:' : 'Notification email failed:',
+      err
+    );
+  } finally {
+    clearTimeout(timeout);
   }
 }
