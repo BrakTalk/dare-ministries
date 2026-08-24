@@ -23,8 +23,11 @@ computer or phone, you can:
 ## Logging In
 
 1. Go to **whofixedtheroof.com/roster**
-2. Enter the admin password — **ask Mason for it** (don't write it somewhere public)
-3. You stay logged in for 7 days on that device, then it asks again
+2. Sign in with the email address and password for your D.A.R.E. Volunteer Portal account
+3. Your account must have **Coordinator** access; the site returns you to the roster after sign-in
+
+Use **Forgot your password?** on the sign-in page if you need a reset email. Do
+not share your account password with anyone else.
 
 ---
 
@@ -66,7 +69,7 @@ or sends a contact message, so you don't need to check the console daily.
 
 ## Questions?
 
-Contact Mason Foley for any technical help, password resets, or importing your
+Contact Mason Foley for technical help, Coordinator access, or importing your
 existing volunteer spreadsheet into the roster.
 
 ---

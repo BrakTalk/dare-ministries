@@ -1,6 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 interface PortalProfile {
+  display_name?: string;
+  email?: string;
   status: 'pending' | 'active' | 'denied' | 'suspended';
   role: 'member' | 'coordinator';
 }
@@ -25,6 +29,7 @@ interface Deferred<T> {
 
 const state = vi.hoisted(() => ({
   getPortalSession: vi.fn(),
+  requireSameOrigin: vi.fn(),
   getDatabase: vi.fn(),
   sql: vi.fn(),
   getStore: vi.fn(),
@@ -32,6 +37,7 @@ const state = vi.hoisted(() => ({
 
 vi.mock('../lib/portal-auth.mjs', () => ({
   getPortalSession: state.getPortalSession,
+  requireSameOrigin: state.requireSameOrigin,
 }));
 
 vi.mock('@netlify/database', () => ({
@@ -48,10 +54,7 @@ import fieldNotesHandler from '../admin-field-notes.mjs';
 import impactStatsHandler from '../admin-impact-stats.mjs';
 import adminSessionHandler from '../admin-session.mjs';
 import volunteersHandler from '../admin-volunteers.mjs';
-import { createSessionCookie, requireAuth } from '../lib/auth.mjs';
-
-const savedEnv: Record<string, string | undefined> = {};
-const DAY_MS = 24 * 60 * 60 * 1000;
+import { getCoordinatorSession, requireAuth } from '../lib/auth.mjs';
 
 const protectedHandlers: ProtectedHandler[] = [
   { name: 'volunteers', path: '/api/admin/volunteers', handler: volunteersHandler },
@@ -68,7 +71,12 @@ const protectedHandlers: ProtectedHandler[] = [
 function activeCoordinatorSession(): PortalSessionResult {
   return {
     user: { id: 'identity-coordinator' },
-    profile: { status: 'active', role: 'coordinator' },
+    profile: {
+      display_name: 'Casey Coordinator',
+      email: 'casey@example.com',
+      status: 'active',
+      role: 'coordinator',
+    },
     db: {},
   };
 }
@@ -85,17 +93,21 @@ function deniedPortalSession(
   };
 }
 
-function adminCookie() {
-  return createSessionCookie().split(';', 1)[0];
+function originDenied() {
+  return new Response(JSON.stringify({ error: 'Request origin is not allowed.' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+  });
 }
 
 function adminRequest(
   path: string,
-  options: { method?: string; body?: unknown; cookie?: string } = {}
+  options: { method?: string; body?: unknown; cookie?: string; origin?: string } = {}
 ) {
   const headers = new Headers();
   if (options.body !== undefined) headers.set('Content-Type', 'application/json');
   if (options.cookie) headers.set('Cookie', options.cookie);
+  if (options.origin) headers.set('Origin', options.origin);
   return new Request(`https://whofixedtheroof.com${path}`, {
     method: options.method || 'GET',
     headers,
@@ -112,13 +124,12 @@ function deferred<T>(): Deferred<T> {
 }
 
 beforeEach(() => {
-  savedEnv.ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
-  savedEnv.SESSION_SECRET = process.env.SESSION_SECRET;
-  process.env.ADMIN_PASSWORD = 'shared-admin-password';
-  process.env.SESSION_SECRET = 'test-session-secret';
-
   state.getPortalSession.mockReset();
   state.getPortalSession.mockResolvedValue(activeCoordinatorSession());
+  state.requireSameOrigin.mockReset();
+  state.requireSameOrigin.mockImplementation((req: Request) =>
+    req.headers.get('origin') === new URL(req.url).origin ? null : originDenied()
+  );
   state.sql.mockReset();
   state.sql.mockResolvedValue([]);
   state.getDatabase.mockReset();
@@ -127,221 +138,159 @@ beforeEach(() => {
   state.getStore.mockReturnValue({});
 });
 
-afterEach(() => {
-  for (const key of ['ADMIN_PASSWORD', 'SESSION_SECRET'] as const) {
-    if (savedEnv[key] === undefined) delete process.env[key];
-    else process.env[key] = savedEnv[key];
-  }
-  vi.useRealTimers();
-  vi.restoreAllMocks();
-});
-
-describe('Phase: Shared admin-session validation', () => {
-  it('❌ PTA-001 rejects a missing shared admin session before portal authorization', async () => {
+describe('Phase: Coordinator authorization contract', () => {
+  it('✅ PTA-001 accepts an active coordinator without a legacy admin cookie', async () => {
     const response = await requireAuth(adminRequest('/api/admin/volunteers'));
-
-    expect(response?.status).toBe(401);
-    await expect(response?.json()).resolves.toEqual({ error: 'Not authenticated' });
-    expect(response?.headers.get('cache-control')).toBe('no-store');
-    expect(state.getPortalSession).not.toHaveBeenCalled();
-  });
-
-  it('🔒 PTA-002 rejects a tampered shared admin cookie without querying portal state', async () => {
-    const response = await requireAuth(
-      adminRequest('/api/admin/volunteers', { cookie: `${adminCookie()}tampered` })
-    );
-
-    expect(response?.status).toBe(401);
-    expect(state.getPortalSession).not.toHaveBeenCalled();
-  });
-
-  it('⚠️ PTA-003 rejects an expired shared admin cookie', async () => {
-    const clock = vi.spyOn(Date, 'now').mockReturnValue(1_000_000);
-    const cookie = adminCookie();
-    clock.mockReturnValue(1_000_000 + 8 * DAY_MS);
-
-    const response = await requireAuth(adminRequest('/api/admin/volunteers', { cookie }));
-
-    expect(response?.status).toBe(401);
-    expect(state.getPortalSession).not.toHaveBeenCalled();
-  });
-
-  it('🔒 PTA-004 rejects every shared cookie when SESSION_SECRET is unavailable', async () => {
-    const cookie = adminCookie();
-    delete process.env.SESSION_SECRET;
-
-    const response = await requireAuth(adminRequest('/api/admin/volunteers', { cookie }));
-
-    expect(response?.status).toBe(401);
-    expect(state.getPortalSession).not.toHaveBeenCalled();
-  });
-
-  it('✅ PTA-005 accepts both factors for an active coordinator', async () => {
-    const response = await requireAuth(
-      adminRequest('/api/admin/volunteers', { cookie: adminCookie() })
-    );
 
     expect(response).toBeNull();
     expect(state.getPortalSession).toHaveBeenCalledWith({
       activeOnly: true,
       role: 'coordinator',
     });
+    expect(state.requireSameOrigin).not.toHaveBeenCalled();
   });
-});
 
-describe('Phase: Portal authorization contract', () => {
-  it('❌ PTA-006 preserves a portal 401 when the Identity session is missing', async () => {
+  it('❌ PTA-002 preserves the portal 401 when the Identity session is missing', async () => {
     const denied = deniedPortalSession(401, 'Please sign in to continue.');
     state.getPortalSession.mockResolvedValue(denied);
 
-    const response = await requireAuth(
-      adminRequest('/api/admin/volunteers', { cookie: adminCookie() })
-    );
+    const response = await requireAuth(adminRequest('/api/admin/volunteers'));
 
     expect(response).toBe(denied.response);
     expect(response?.status).toBe(401);
+    expect(response?.headers.get('cache-control')).toBe('no-store');
   });
 
-  it('🔒 PTA-007 preserves a portal 403 for an inactive or non-coordinator profile', async () => {
+  it('🔒 PTA-003 preserves a 403 for an inactive or non-coordinator profile', async () => {
     const denied = deniedPortalSession();
     state.getPortalSession.mockResolvedValue(denied);
 
-    const response = await requireAuth(
-      adminRequest('/api/admin/volunteers', { cookie: adminCookie() })
-    );
+    const response = await requireAuth(adminRequest('/api/admin/volunteers'));
 
     expect(response).toBe(denied.response);
     expect(response?.status).toBe(403);
   });
 
-  it('🔒 PTA-008 fails closed when PortalAuth returns a malformed session object', async () => {
+  it('🔒 PTA-004 fails closed when PortalAuth returns a malformed session object', async () => {
     state.getPortalSession.mockResolvedValue({});
 
-    const response = await requireAuth(
-      adminRequest('/api/admin/volunteers', { cookie: adminCookie() })
-    );
+    const response = await requireAuth(adminRequest('/api/admin/volunteers'));
 
     expect(response?.status).toBe(403);
     await expect(response?.json()).resolves.toEqual({
       error: 'Private tool access could not be verified.',
     });
-    expect(response?.headers.get('cache-control')).toBe('no-store');
   });
 
-  it('🔒 PTA-009 gives an unauthorized response precedence over conflicting profile data', async () => {
+  it('🔒 PTA-005 gives a denial response precedence over conflicting profile data', async () => {
     const denied = deniedPortalSession();
     state.getPortalSession.mockResolvedValue({
       ...activeCoordinatorSession(),
       response: denied.response,
     });
 
-    const response = await requireAuth(
-      adminRequest('/api/admin/volunteers', { cookie: adminCookie() })
+    const session = await getCoordinatorSession();
+
+    expect(session.response).toBe(denied.response);
+    expect(session.profile).toBeUndefined();
+  });
+
+  it('❌ PTA-006 propagates Identity/database failures and never grants access', async () => {
+    const failure = new Error('Identity or database unavailable');
+    state.getPortalSession.mockRejectedValue(failure);
+
+    await expect(requireAuth(adminRequest('/api/admin/volunteers'))).rejects.toBe(failure);
+  });
+});
+
+describe('Phase: Same-origin mutation protection', () => {
+  it('✅ PTA-007 checks the origin after coordinator authorization for mutations', async () => {
+    const request = adminRequest('/api/admin/volunteers', {
+      method: 'POST',
+      origin: 'https://whofixedtheroof.com',
+    });
+
+    const response = await requireAuth(request);
+
+    expect(response).toBeNull();
+    expect(state.getPortalSession).toHaveBeenCalledTimes(1);
+    expect(state.requireSameOrigin).toHaveBeenCalledWith(request);
+  });
+
+  it('🔒 PTA-008 rejects a missing or cross-origin mutation before domain access', async () => {
+    const requests = [
+      adminRequest('/api/admin/volunteers', { method: 'POST', body: { name: 'A' } }),
+      adminRequest('/api/admin/volunteers', {
+        method: 'POST',
+        body: { name: 'A' },
+        origin: 'https://attacker.example',
+      }),
+    ];
+
+    for (const request of requests) {
+      const response = await volunteersHandler(request);
+      expect(response.status).toBe(403);
+    }
+    expect(state.getDatabase).not.toHaveBeenCalled();
+  });
+
+  it('✅ PTA-009 permits a same-origin mutation to reach its handler', async () => {
+    state.sql.mockResolvedValue([{ id: 'volunteer-id' }]);
+
+    const response = await volunteersHandler(
+      adminRequest('/api/admin/volunteers', {
+        method: 'POST',
+        origin: 'https://whofixedtheroof.com',
+        body: { name: 'Alex', email: 'alex@example.com' },
+      })
     );
+
+    expect(response.status).toBe(201);
+    expect(state.getDatabase).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('Phase: Coordinator session endpoint', () => {
+  it('✅ PTA-010 returns a minimal no-store coordinator profile', async () => {
+    const response = await adminSessionHandler(adminRequest('/api/admin/session'));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    await expect(response.json()).resolves.toEqual({
+      authenticated: true,
+      profile: {
+        display_name: 'Casey Coordinator',
+        email: 'casey@example.com',
+        status: 'active',
+        role: 'coordinator',
+      },
+    });
+  });
+
+  it('🔒 PTA-011 returns the exact Identity/profile denial', async () => {
+    const denied = deniedPortalSession(401, 'Please sign in to continue.');
+    state.getPortalSession.mockResolvedValue(denied);
+
+    const response = await adminSessionHandler(adminRequest('/api/admin/session'));
 
     expect(response).toBe(denied.response);
   });
 
-  it('❌ PTA-010 propagates a PortalAuth failure and never converts it into authorization', async () => {
-    const failure = new Error('Identity or database unavailable');
-    state.getPortalSession.mockRejectedValue(failure);
-
-    await expect(
-      requireAuth(adminRequest('/api/admin/volunteers', { cookie: adminCookie() }))
-    ).rejects.toBe(failure);
-  });
-});
-
-describe('Phase: Shared admin-session lifecycle', () => {
-  it('✅ PTA-011 issues the shared admin cookie only after active-coordinator verification', async () => {
+  it('❌ PTA-012 rejects non-GET methods without checking Identity', async () => {
     const response = await adminSessionHandler(
-      adminRequest('/api/admin/login', {
-        method: 'POST',
-        body: { password: 'shared-admin-password' },
-      })
+      adminRequest('/api/admin/session', { method: 'POST', origin: 'https://whofixedtheroof.com' })
     );
 
-    expect(response.status).toBe(200);
-    expect(response.headers.get('set-cookie')).toContain('dare_admin_session=');
-    expect(state.getPortalSession).toHaveBeenCalledTimes(1);
-  });
-
-  it('🔒 PTA-012 rejects and throttles an incorrect shared password without leaking it', async () => {
-    vi.useFakeTimers();
-    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    const infoLog = vi.spyOn(console, 'info').mockImplementation(() => undefined);
-    const responsePromise = adminSessionHandler(
-      adminRequest('/api/admin/login', {
-        method: 'POST',
-        body: { password: 'not-the-shared-password' },
-      })
-    );
-
-    await vi.advanceTimersByTimeAsync(800);
-    const response = await responsePromise;
-
-    expect(response.status).toBe(401);
-    expect(state.getPortalSession).not.toHaveBeenCalled();
-    expect(errorLog).not.toHaveBeenCalled();
-    expect(infoLog).not.toHaveBeenCalled();
-  });
-
-  it('🔒 PTA-013 does not issue a shared cookie to an inactive profile', async () => {
-    state.getPortalSession.mockResolvedValue(deniedPortalSession());
-
-    const response = await adminSessionHandler(
-      adminRequest('/api/admin/login', {
-        method: 'POST',
-        body: { password: 'shared-admin-password' },
-      })
-    );
-
-    expect(response.status).toBe(403);
-    expect(response.headers.get('set-cookie')).toBeNull();
-  });
-
-  it('✅ PTA-014 reports an existing session as authenticated while coordinator access remains active', async () => {
-    const response = await adminSessionHandler(
-      adminRequest('/api/admin/login', { cookie: adminCookie() })
-    );
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ authenticated: true });
-  });
-
-  it('🔒 PTA-015 reports an existing session as logged out after coordinator access is revoked', async () => {
-    state.getPortalSession.mockResolvedValue(deniedPortalSession());
-
-    const response = await adminSessionHandler(
-      adminRequest('/api/admin/login', { cookie: adminCookie() })
-    );
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ authenticated: false });
-  });
-
-  it('✅ PTA-016 clears the shared cookie on logout without requiring a live portal dependency', async () => {
-    state.getPortalSession.mockRejectedValue(new Error('Identity unavailable'));
-
-    const response = await adminSessionHandler(
-      adminRequest('/api/admin/logout', {
-        method: 'POST',
-        cookie: adminCookie(),
-      })
-    );
-
-    expect(response.status).toBe(200);
-    expect(response.headers.get('set-cookie')).toContain('Max-Age=0');
+    expect(response.status).toBe(405);
+    expect(response.headers.get('cache-control')).toBe('no-store');
     expect(state.getPortalSession).not.toHaveBeenCalled();
   });
 });
 
 describe('Phase: Protected handler propagation', () => {
-  it('✅ PTA-017 awaits authorization in every private-tool handler before dispatching', async () => {
+  it('✅ PTA-013 awaits coordinator authorization in every private-tool handler', async () => {
     const responses = await Promise.all(
-      protectedHandlers.map(({ path, handler }) =>
-        handler(adminRequest(path, { method: 'HEAD', cookie: adminCookie() }))
-      )
+      protectedHandlers.map(({ path, handler }) => handler(adminRequest(path, { method: 'HEAD' })))
     );
 
     expect(responses.map((response) => response.status)).toEqual([405, 405, 405, 405, 405]);
@@ -349,13 +298,11 @@ describe('Phase: Protected handler propagation', () => {
     expect(state.getDatabase).toHaveBeenCalledTimes(4);
   });
 
-  it('🔒 PTA-018 returns denial from every private-tool handler before database or blob access', async () => {
+  it('🔒 PTA-014 returns denial before database or blob access in every private tool', async () => {
     state.getPortalSession.mockResolvedValue(deniedPortalSession());
 
     const responses = await Promise.all(
-      protectedHandlers.map(({ path, handler }) =>
-        handler(adminRequest(path, { method: 'HEAD', cookie: adminCookie() }))
-      )
+      protectedHandlers.map(({ path, handler }) => handler(adminRequest(path, { method: 'HEAD' })))
     );
 
     expect(responses.map((response) => response.status)).toEqual([403, 403, 403, 403, 403]);
@@ -363,24 +310,25 @@ describe('Phase: Protected handler propagation', () => {
     expect(state.getStore).not.toHaveBeenCalled();
   });
 
-  it('❌ PTA-019 returns a stable 401 contract from a protected handler with no shared session', async () => {
+  it('❌ PTA-015 returns a stable 401 from a protected handler without Identity', async () => {
+    state.getPortalSession.mockResolvedValue(
+      deniedPortalSession(401, 'Please sign in to continue.')
+    );
+
     const response = await volunteersHandler(adminRequest('/api/admin/volunteers'));
 
     expect(response.status).toBe(401);
-    expect(response.headers.get('content-type')).toBe('application/json');
     expect(response.headers.get('cache-control')).toBe('no-store');
-    await expect(response.json()).resolves.toEqual({ error: 'Not authenticated' });
-    expect(state.getPortalSession).not.toHaveBeenCalled();
     expect(state.getDatabase).not.toHaveBeenCalled();
   });
 });
 
-describe('Phase: Replay, concurrency, and dependency failure', () => {
-  it('🔒 PTA-020 revalidates a duplicate request instead of replaying stale authorization', async () => {
+describe('Phase: Revocation, concurrency, and legacy removal', () => {
+  it('🔒 PTA-016 revalidates duplicate requests instead of replaying stale authorization', async () => {
     state.getPortalSession
       .mockResolvedValueOnce(activeCoordinatorSession())
       .mockResolvedValueOnce(deniedPortalSession());
-    const request = () => adminRequest('/api/admin/volunteers', { cookie: adminCookie() });
+    const request = () => adminRequest('/api/admin/volunteers');
 
     const first = await requireAuth(request());
     const replay = await requireAuth(request());
@@ -390,15 +338,15 @@ describe('Phase: Replay, concurrency, and dependency failure', () => {
     expect(state.getPortalSession).toHaveBeenCalledTimes(2);
   });
 
-  it('⚠️ PTA-021 isolates concurrent authorization outcomes for different requests', async () => {
+  it('⚠️ PTA-017 isolates concurrent coordinator authorization outcomes', async () => {
     const active = deferred<PortalSessionResult>();
     const denied = deferred<PortalSessionResult>();
     state.getPortalSession
       .mockImplementationOnce(() => active.promise)
       .mockImplementationOnce(() => denied.promise);
 
-    const first = requireAuth(adminRequest('/api/admin/volunteers', { cookie: adminCookie() }));
-    const second = requireAuth(adminRequest('/api/admin/volunteers', { cookie: adminCookie() }));
+    const first = requireAuth(adminRequest('/api/admin/volunteers'));
+    const second = requireAuth(adminRequest('/api/admin/volunteers'));
     denied.resolve(deniedPortalSession());
     active.resolve(activeCoordinatorSession());
 
@@ -407,17 +355,20 @@ describe('Phase: Replay, concurrency, and dependency failure', () => {
     expect(secondResult?.status).toBe(403);
   });
 
-  it('❌ PTA-022 does not issue a cookie when PortalAuth fails during login', async () => {
-    const failure = new Error('Database unavailable');
-    state.getPortalSession.mockRejectedValue(failure);
+  it('🔒 PTA-018 removes the shared password, HMAC secret, and legacy cookie contract', () => {
+    const authSource = readFileSync(
+      resolve(process.cwd(), 'netlify/functions/lib/auth.mjs'),
+      'utf8'
+    );
+    const sessionSource = readFileSync(
+      resolve(process.cwd(), 'netlify/functions/admin-session.mjs'),
+      'utf8'
+    );
+    const source = authSource + sessionSource;
 
-    await expect(
-      adminSessionHandler(
-        adminRequest('/api/admin/login', {
-          method: 'POST',
-          body: { password: 'shared-admin-password' },
-        })
-      )
-    ).rejects.toBe(failure);
+    expect(source).not.toContain('ADMIN_PASSWORD');
+    expect(source).not.toContain('SESSION_SECRET');
+    expect(source).not.toContain('dare_admin_session');
+    expect(source).not.toContain('/api/admin/login');
   });
 });

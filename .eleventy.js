@@ -2,8 +2,8 @@ require('dotenv').config();
 const { DateTime } = require('luxon');
 const markdownIt = require('markdown-it');
 
-// html: false — field note authors share one admin password, so raw HTML in
-// entry bodies must never reach the public site.
+// html: false — field note content is authored through a privileged tool, but
+// raw HTML must still never reach the public site.
 const md = markdownIt({ html: false, linkify: true });
 
 module.exports = function (eleventyConfig) {

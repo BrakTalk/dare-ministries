@@ -25,7 +25,7 @@
   display: none !important;
 }
 
-/* --- Login --- */
+/* --- Coordinator access state --- */
 
 .roster-login {
   display: flex;
@@ -53,6 +53,11 @@
   color: var(--color-text-light);
   font-size: 0.95rem;
   margin-bottom: 1.25rem;
+}
+
+.roster-access-actions {
+  display: grid;
+  gap: 0.75rem;
 }
 
 /* --- Console layout --- */
@@ -118,7 +123,6 @@
 
 .roster-toolbar input,
 .roster-toolbar select,
-.roster-login-card input,
 .roster-modal input,
 .roster-modal select,
 .roster-modal textarea,
@@ -391,8 +395,7 @@
   font-size: 0.85rem;
 }
 
-.roster-modal .form-group,
-.roster-login-card .form-group {
+.roster-modal .form-group {
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
@@ -400,7 +403,6 @@
 }
 
 .roster-modal label,
-.roster-login-card label,
 .roster-stats-form label {
   font-weight: 600;
   font-size: 0.9rem;

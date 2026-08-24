@@ -18,7 +18,10 @@ interface DbRoute {
 const state = vi.hoisted(() => ({
   authed: true,
   dbCalls: [] as { text: string; values: unknown[] }[],
-  dbRoutes: [] as { match: RegExp; handler: (values: unknown[]) => unknown[] | Promise<unknown[]> }[],
+  dbRoutes: [] as {
+    match: RegExp;
+    handler: (values: unknown[]) => unknown[] | Promise<unknown[]>;
+  }[],
   timeline: [] as string[],
   store: null as Record<string, ReturnType<typeof vi.fn>> | null,
 }));
@@ -42,7 +45,6 @@ vi.mock('@netlify/blobs', () => ({
 }));
 
 vi.mock('../lib/auth.mjs', () => ({
-  isAuthenticated: () => state.authed,
   requireAuth: () =>
     state.authed
       ? null
@@ -85,7 +87,12 @@ function jsonReq(method: string, body?: unknown): Request {
   } as RequestInit);
 }
 
-function photoUploadReq(bytes: Uint8Array, contentType: string, noteId = NOTE_ID, alt = ''): Request {
+function photoUploadReq(
+  bytes: Uint8Array,
+  contentType: string,
+  noteId = NOTE_ID,
+  alt = ''
+): Request {
   const url = new URL('http://localhost/api/admin/field-note-photos');
   url.searchParams.set('note_id', noteId);
   if (alt) url.searchParams.set('alt', alt);
@@ -181,7 +188,12 @@ describe('Phase: Note save & publish (admin-field-notes)', () => {
   it('✅ N1 creates a valid draft with a dated slug', async () => {
     onDb(/INSERT INTO field_notes/, (values) => [{ id: NOTE_ID, slug: values[0] }]);
     const res = await notesHandler(
-      jsonReq('POST', { title: 'Roswell UMC / DARE Trip to Augusta, GA', start_date: '2026-07-16', end_date: '2026-07-18', body: 'Recap' })
+      jsonReq('POST', {
+        title: 'Roswell UMC / DARE Trip to Augusta, GA',
+        start_date: '2026-07-16',
+        end_date: '2026-07-18',
+        body: 'Recap',
+      })
     );
     expect(res.status).toBe(201);
     const body = await res.json();
@@ -202,7 +214,9 @@ describe('Phase: Note save & publish (admin-field-notes)', () => {
   });
 
   it('❌ N4 rejects a malformed end_date', async () => {
-    const res = await notesHandler(jsonReq('POST', { title: 'Trip', start_date: '2026-07-16', end_date: '18-07-2026' }));
+    const res = await notesHandler(
+      jsonReq('POST', { title: 'Trip', start_date: '2026-07-16', end_date: '18-07-2026' })
+    );
     expect(res.status).toBe(400);
   });
 
@@ -210,10 +224,13 @@ describe('Phase: Note save & publish (admin-field-notes)', () => {
     let attempts = 0;
     onDb(/INSERT INTO field_notes/, (values) => {
       attempts++;
-      if (attempts === 1) throw new Error('duplicate key value violates unique constraint "field_notes_slug_key"');
+      if (attempts === 1)
+        throw new Error('duplicate key value violates unique constraint "field_notes_slug_key"');
       return [{ id: NOTE_ID, slug: values[0] }];
     });
-    const res = await notesHandler(jsonReq('POST', { title: 'Augusta Trip', start_date: '2026-07-16' }));
+    const res = await notesHandler(
+      jsonReq('POST', { title: 'Augusta Trip', start_date: '2026-07-16' })
+    );
     expect(res.status).toBe(201);
     expect((await res.json()).slug).toBe('2026-07-augusta-trip-2');
     expect(attempts).toBe(2);
@@ -242,7 +259,9 @@ describe('Phase: Note save & publish (admin-field-notes)', () => {
 
   it('⚠️ N8 republish keeps the original published_at', async () => {
     const original = '2026-01-01T00:00:00.000Z';
-    onDb(/SELECT \* FROM field_notes WHERE id/, [noteRow({ status: 'draft', published_at: original })]);
+    onDb(/SELECT \* FROM field_notes WHERE id/, [
+      noteRow({ status: 'draft', published_at: original }),
+    ]);
     await notesHandler(jsonReq('PATCH', { id: NOTE_ID, status: 'published' }));
     const update = dbCall(/UPDATE field_notes SET/)!;
     expect(update.values[6]).toBe(original);
@@ -397,11 +416,9 @@ describe('Phase: Photo upload (admin-field-note-photos POST)', () => {
     expect(res.status).toBe(201);
     const body = await res.json();
     expect(body).toEqual({ ok: true, id: PHOTO_ID, url: `/images/field/${NOTE_ID}/${PHOTO_ID}` });
-    expect(state.store!.set).toHaveBeenCalledWith(
-      `${NOTE_ID}/${PHOTO_ID}`,
-      expect.anything(),
-      { metadata: { contentType: 'image/jpeg' } }
-    );
+    expect(state.store!.set).toHaveBeenCalledWith(`${NOTE_ID}/${PHOTO_ID}`, expect.anything(), {
+      metadata: { contentType: 'image/jpeg' },
+    });
   });
 
   it('❌ P2 rejects a disallowed content type with 415 and no persistence', async () => {
@@ -513,7 +530,9 @@ describe('Phase: Photo manage (PATCH / DELETE)', () => {
     stubPhotoExists();
     const res = await photosHandler(photoJsonReq('DELETE', { id: PHOTO_ID }));
     expect(res.status).toBe(200);
-    const rowIdx = state.timeline.findIndex((e) => e.startsWith('db:DELETE FROM field_note_photos'));
+    const rowIdx = state.timeline.findIndex((e) =>
+      e.startsWith('db:DELETE FROM field_note_photos')
+    );
     const blobIdx = state.timeline.indexOf('blob:delete');
     expect(rowIdx).toBeGreaterThanOrEqual(0);
     expect(blobIdx).toBeGreaterThan(rowIdx);
@@ -522,7 +541,9 @@ describe('Phase: Photo manage (PATCH / DELETE)', () => {
   it('⚠️ M4 blob-delete failure surfaces an error but the row stays deleted', async () => {
     stubPhotoExists();
     state.store!.delete.mockRejectedValue(new Error('blob store down'));
-    await expect(photosHandler(photoJsonReq('DELETE', { id: PHOTO_ID }))).rejects.toThrow('blob store down');
+    await expect(photosHandler(photoJsonReq('DELETE', { id: PHOTO_ID }))).rejects.toThrow(
+      'blob store down'
+    );
     expect(dbCall(/DELETE FROM field_note_photos/)).toBeDefined();
   });
 
@@ -534,7 +555,9 @@ describe('Phase: Photo manage (PATCH / DELETE)', () => {
 
   it('⚠️ M6 a non-integer sort_order is ignored', async () => {
     stubPhotoExists();
-    const res = await photosHandler(photoJsonReq('PATCH', { id: PHOTO_ID, sort_order: '2; DROP TABLE x' }));
+    const res = await photosHandler(
+      photoJsonReq('PATCH', { id: PHOTO_ID, sort_order: '2; DROP TABLE x' })
+    );
     expect(res.status).toBe(200);
     expect(dbCall(/SET sort_order/)).toBeUndefined();
   });
@@ -557,7 +580,17 @@ describe('Phase: Build-time load (src/_data/fieldNotes.js)', () => {
 
   it('✅ B1 returns published notes with photos, cover, and date_display', async () => {
     stubPublished(
-      [{ id: NOTE_ID, slug: 's', title: 'T', start_date: '2026-07-16', end_date: '2026-07-18', body: 'B', published_at: 'x' }],
+      [
+        {
+          id: NOTE_ID,
+          slug: 's',
+          title: 'T',
+          start_date: '2026-07-16',
+          end_date: '2026-07-18',
+          body: 'B',
+          published_at: 'x',
+        },
+      ],
       [
         { id: PHOTO_ID, note_id: NOTE_ID, alt: 'Crew', is_cover: false },
         { id: OTHER_ID, note_id: NOTE_ID, alt: 'Roof', is_cover: true },
@@ -574,8 +607,24 @@ describe('Phase: Build-time load (src/_data/fieldNotes.js)', () => {
   it('⚠️ B2 cover falls back to the first photo, else null', async () => {
     stubPublished(
       [
-        { id: NOTE_ID, slug: 'a', title: 'A', start_date: '2026-07-16', end_date: null, body: '', published_at: 'x' },
-        { id: OTHER_ID, slug: 'b', title: 'B', start_date: '2026-06-01', end_date: null, body: '', published_at: 'x' },
+        {
+          id: NOTE_ID,
+          slug: 'a',
+          title: 'A',
+          start_date: '2026-07-16',
+          end_date: null,
+          body: '',
+          published_at: 'x',
+        },
+        {
+          id: OTHER_ID,
+          slug: 'b',
+          title: 'B',
+          start_date: '2026-06-01',
+          end_date: null,
+          body: '',
+          published_at: 'x',
+        },
       ],
       [{ id: PHOTO_ID, note_id: NOTE_ID, alt: 'First', is_cover: false }]
     );
@@ -608,9 +657,33 @@ describe('Phase: Build-time load (src/_data/fieldNotes.js)', () => {
 
   it('✅ B6/B7 date_display variants: single day, cross-month, cross-year', async () => {
     stubPublished([
-      { id: NOTE_ID, slug: 'a', title: 'A', start_date: '2026-05-09', end_date: null, body: '', published_at: 'x' },
-      { id: OTHER_ID, slug: 'b', title: 'B', start_date: '2026-06-30', end_date: '2026-07-02', body: '', published_at: 'x' },
-      { id: PHOTO_ID, slug: 'c', title: 'C', start_date: '2026-12-30', end_date: '2027-01-02', body: '', published_at: 'x' },
+      {
+        id: NOTE_ID,
+        slug: 'a',
+        title: 'A',
+        start_date: '2026-05-09',
+        end_date: null,
+        body: '',
+        published_at: 'x',
+      },
+      {
+        id: OTHER_ID,
+        slug: 'b',
+        title: 'B',
+        start_date: '2026-06-30',
+        end_date: '2026-07-02',
+        body: '',
+        published_at: 'x',
+      },
+      {
+        id: PHOTO_ID,
+        slug: 'c',
+        title: 'C',
+        start_date: '2026-12-30',
+        end_date: '2027-01-02',
+        body: '',
+        published_at: 'x',
+      },
     ]);
     const notes = await fieldNotesData();
     const displays = notes.map((n: { date_display: string }) => n.date_display);
@@ -638,7 +711,17 @@ describe('Phase: Build-time load (src/_data/fieldNotes.js)', () => {
       ok: true,
       status: 200,
       json: async () => ({
-        notes: [{ id: NOTE_ID, slug: 's', title: 'T', start_date: '2026-07-16', end_date: '2026-07-18', body: 'B', published_at: 'x' }],
+        notes: [
+          {
+            id: NOTE_ID,
+            slug: 's',
+            title: 'T',
+            start_date: '2026-07-16',
+            end_date: '2026-07-18',
+            body: 'B',
+            published_at: 'x',
+          },
+        ],
         photos: [{ id: PHOTO_ID, note_id: NOTE_ID, alt: 'Crew', is_cover: true }],
       }),
     }));
@@ -654,14 +737,20 @@ describe('Phase: Build-time load (src/_data/fieldNotes.js)', () => {
   it('⚠️ B10 a 404 from the feed (first deploy bootstrap) warns and builds empty', async () => {
     netlifyBuildEnv();
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 404 })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: false, status: 404 }))
+    );
     await expect(fieldNotesData()).resolves.toEqual([]);
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('not found'));
   });
 
   it('❌ B11 any other feed failure fails the build (rejects)', async () => {
     netlifyBuildEnv();
-    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 500 })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: false, status: 500 }))
+    );
     await expect(fieldNotesData()).rejects.toThrow('feed fetch failed: 500');
   });
 });
@@ -672,9 +761,17 @@ describe('Phase: Build feed function (field-notes-feed)', () => {
   const feedReq = (method = 'GET') =>
     new Request('http://localhost/api/field-notes-feed', { method });
 
-  it("🔒 F1 serves published entries only, with the gate in the SQL and no-store caching", async () => {
+  it('🔒 F1 serves published entries only, with the gate in the SQL and no-store caching', async () => {
     onDb(/FROM field_notes WHERE status/, [
-      { id: NOTE_ID, slug: 's', title: 'T', start_date: '2026-07-16', end_date: null, body: 'B', published_at: 'x' },
+      {
+        id: NOTE_ID,
+        slug: 's',
+        title: 'T',
+        start_date: '2026-07-16',
+        end_date: null,
+        body: 'B',
+        published_at: 'x',
+      },
     ]);
     onDb(/FROM field_note_photos WHERE note_id/, [
       { id: PHOTO_ID, note_id: NOTE_ID, alt: 'Crew', is_cover: false },
@@ -717,11 +814,15 @@ describe('Phase: Public photo serving (field-photo)', () => {
       data: 'stream-stub',
       metadata: { contentType: 'image/png' },
     });
-    const res = await servePhotoHandler(serveReq, { params: { noteId: NOTE_ID, photoId: PHOTO_ID } });
+    const res = await servePhotoHandler(serveReq, {
+      params: { noteId: NOTE_ID, photoId: PHOTO_ID },
+    });
     expect(res.status).toBe(200);
     expect(res.headers.get('Content-Type')).toBe('image/png');
     expect(res.headers.get('Cache-Control')).toBe('public, max-age=31536000, immutable');
-    expect(state.store!.getWithMetadata).toHaveBeenCalledWith(`${NOTE_ID}/${PHOTO_ID}`, { type: 'stream' });
+    expect(state.store!.getWithMetadata).toHaveBeenCalledWith(`${NOTE_ID}/${PHOTO_ID}`, {
+      type: 'stream',
+    });
   });
 
   it('🔒 S2 malformed path params return 404 without touching the DB or store', async () => {
@@ -736,14 +837,18 @@ describe('Phase: Public photo serving (field-photo)', () => {
   it('❌ S3 a missing blob returns 404 even when the row exists', async () => {
     stubPhotoRow('published');
     state.store!.getWithMetadata.mockResolvedValue(null);
-    const res = await servePhotoHandler(serveReq, { params: { noteId: NOTE_ID, photoId: PHOTO_ID } });
+    const res = await servePhotoHandler(serveReq, {
+      params: { noteId: NOTE_ID, photoId: PHOTO_ID },
+    });
     expect(res.status).toBe(404);
   });
 
   it('⚠️ S4 missing blob metadata falls back to image/jpeg (row present and published)', async () => {
     stubPhotoRow('published');
     state.store!.getWithMetadata.mockResolvedValue({ data: 'stream-stub', metadata: null });
-    const res = await servePhotoHandler(serveReq, { params: { noteId: NOTE_ID, photoId: PHOTO_ID } });
+    const res = await servePhotoHandler(serveReq, {
+      params: { noteId: NOTE_ID, photoId: PHOTO_ID },
+    });
     expect(res.headers.get('Content-Type')).toBe('image/jpeg');
   });
 
@@ -751,19 +856,23 @@ describe('Phase: Public photo serving (field-photo)', () => {
     state.authed = false;
     stubPhotoRow('draft');
     state.store!.getWithMetadata.mockResolvedValue({ data: 'stream-stub', metadata: {} });
-    const res = await servePhotoHandler(serveReq, { params: { noteId: NOTE_ID, photoId: PHOTO_ID } });
+    const res = await servePhotoHandler(serveReq, {
+      params: { noteId: NOTE_ID, photoId: PHOTO_ID },
+    });
     expect(res.status).toBe(404);
     expect(state.store!.getWithMetadata).not.toHaveBeenCalled();
   });
 
-  it('🔒 S6 a draft-note photo is served to an admin session with no-store caching', async () => {
+  it('🔒 S6 a draft-note photo is served to an active coordinator with no-store caching', async () => {
     state.authed = true;
     stubPhotoRow('draft');
     state.store!.getWithMetadata.mockResolvedValue({
       data: 'stream-stub',
       metadata: { contentType: 'image/jpeg' },
     });
-    const res = await servePhotoHandler(serveReq, { params: { noteId: NOTE_ID, photoId: PHOTO_ID } });
+    const res = await servePhotoHandler(serveReq, {
+      params: { noteId: NOTE_ID, photoId: PHOTO_ID },
+    });
     expect(res.status).toBe(200);
     expect(res.headers.get('Cache-Control')).toBe('private, no-store');
   });
@@ -771,7 +880,9 @@ describe('Phase: Public photo serving (field-photo)', () => {
   it('🔒 S7 an orphaned blob with no metadata row (deleted note) is never served', async () => {
     // No DB route → the join returns no rows, as after M4's row-first delete.
     state.store!.getWithMetadata.mockResolvedValue({ data: 'stream-stub', metadata: {} });
-    const res = await servePhotoHandler(serveReq, { params: { noteId: NOTE_ID, photoId: PHOTO_ID } });
+    const res = await servePhotoHandler(serveReq, {
+      params: { noteId: NOTE_ID, photoId: PHOTO_ID },
+    });
     expect(res.status).toBe(404);
     expect(state.store!.getWithMetadata).not.toHaveBeenCalled();
   });

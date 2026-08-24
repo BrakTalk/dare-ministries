@@ -16,7 +16,7 @@ This is an Eleventy (v3) static site for D.A.R.E. Ministries, a faith-based disa
 - **Content data:** JSON files in `src/_data/` (site.json, projects.json, gallery.json) — edited directly in the repo
 - **Database:** Netlify DB (managed Postgres). Schema migrations live in `netlify/database/migrations/` and are applied automatically on deploy. Tables: `volunteers`, `contacts`, `impact_stats`, `field_notes`, `field_note_photos`, `user_profiles`, `portal_audit_log`.
 - **API:** Netlify Functions in `netlify/functions/` (`/api/volunteer`, `/api/contact`, `/api/impact-stats`) using `@netlify/database`. The front end (`src/js/forms.js`) calls these with plain `fetch` — no database credentials in the browser. Optional email notifications on form submissions via Resend (`RESEND_API_KEY`, `NOTIFY_EMAIL` env vars).
-- **Admin console:** `/roster` (`src/roster.njk`, `src/js/roster.js`, `src/css/roster.css`) — volunteer roster, contact inbox, impact stats editor, and field notes editor. Auth is a shared admin password (`ADMIN_PASSWORD` env var) checked by `/api/admin/login`, which issues an HMAC-signed HttpOnly session cookie (`SESSION_SECRET` env var, 7-day expiry). Existing roster administration functions verify that cookie server-side; `/api/admin/user-profiles` instead uses the individual Volunteer Portal coordinator role.
+- **Admin console:** `/roster` (`src/roster.njk`, `src/js/roster.js`, `src/css/roster.css`) — volunteer roster, contact inbox, impact stats editor, and field notes editor. It uses the same individual Netlify Identity credentials as the Volunteer Portal. Every private-tool request verifies an authoritative `user_profiles` row with `status=active` and `role=coordinator`; anonymous visitors return through `/login/?next=/roster/`, while signed-in non-coordinators receive an access-denied view. `GET /api/admin/session` supplies the roster boot check. There is no shared roster password or separate admin session cookie.
 - **Volunteer Portal:** `/login`, `/register`, and `/portal` use Netlify Identity for individual credentials. D.A.R.E.-specific profile approval and roles live in `user_profiles`; `netlify/functions/lib/portal-auth.mjs` verifies Identity and database access on every protected API call. New accounts are `pending` until a coordinator approves them from `/portal#access`. Identity must be enabled with open registration and email confirmation in the Netlify project settings. Assign the first coordinator an Identity role of `coordinator` (or `admin`) to bootstrap their database profile.
 - **From the Field:** trip recap entries authored in the Field Notes tab of `/roster`, stored in `field_notes` (markdown body, draft/published status, server-generated slug frozen once published). Photos upload to the Netlify Blobs store `field-photos` (key `<note_id>/<photo_id>`) and are served by `netlify/functions/field-photo.mjs` at `/images/field/:noteId/:photoId` with immutable caching — never create `src/images/field/`, the passthrough copy would shadow that route. The public pages are static: `src/_data/fieldNotes.js` fetches **published** entries at build time — directly from Postgres when `NETLIFY_DATABASE_URL` is present, else (Netlify builds: the platform injects that var into the functions runtime only, never into builds) via the site's own `/api/field-notes-feed` function (`netlify/functions/field-notes-feed.mjs`, published-only, no-store); feed 404 = bootstrap → empty build, any other error throws so a bad build never replaces a good one. Publish/unpublish/delete trigger a rebuild via the `BUILD_HOOK_URL` env var (all scopes — per-scope env vars need a paid Netlify plan; safe because no build-time code ever calls the hook, only the admin functions do, so a build loop can't occur). Markdown renders at build via the `markdown` filter (markdown-it, `html: false` — authors must not be able to inject HTML).
 - **Static assets:** `src/css/`, `src/js/`, `src/images/` (passed through by Eleventy)
@@ -31,6 +31,7 @@ This is an Eleventy (v3) static site for D.A.R.E. Ministries, a faith-based disa
 - Node version 20 is required (set in `netlify.toml`)
 
 <!-- gitnexus:start -->
+
 # GitNexus — Code Intelligence
 
 This project is indexed by GitNexus as **dare-ministries** (337 symbols, 647 relationships, 20 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
@@ -55,22 +56,22 @@ This project is indexed by GitNexus as **dare-ministries** (337 symbols, 647 rel
 
 ## Resources
 
-| Resource | Use for |
-|----------|---------|
-| `gitnexus://repo/dare-ministries/context` | Codebase overview, check index freshness |
-| `gitnexus://repo/dare-ministries/clusters` | All functional areas |
-| `gitnexus://repo/dare-ministries/processes` | All execution flows |
-| `gitnexus://repo/dare-ministries/process/{name}` | Step-by-step execution trace |
+| Resource                                         | Use for                                  |
+| ------------------------------------------------ | ---------------------------------------- |
+| `gitnexus://repo/dare-ministries/context`        | Codebase overview, check index freshness |
+| `gitnexus://repo/dare-ministries/clusters`       | All functional areas                     |
+| `gitnexus://repo/dare-ministries/processes`      | All execution flows                      |
+| `gitnexus://repo/dare-ministries/process/{name}` | Step-by-step execution trace             |
 
 ## CLI
 
-| Task | Read this skill file |
-|------|---------------------|
-| Understand architecture / "How does X work?" | `.claude/skills/gitnexus/gitnexus-exploring/SKILL.md` |
-| Blast radius / "What breaks if I change X?" | `.claude/skills/gitnexus/gitnexus-impact-analysis/SKILL.md` |
-| Trace bugs / "Why is X failing?" | `.claude/skills/gitnexus/gitnexus-debugging/SKILL.md` |
-| Rename / extract / split / refactor | `.claude/skills/gitnexus/gitnexus-refactoring/SKILL.md` |
-| Tools, resources, schema reference | `.claude/skills/gitnexus/gitnexus-guide/SKILL.md` |
-| Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md` |
+| Task                                         | Read this skill file                                        |
+| -------------------------------------------- | ----------------------------------------------------------- |
+| Understand architecture / "How does X work?" | `.claude/skills/gitnexus/gitnexus-exploring/SKILL.md`       |
+| Blast radius / "What breaks if I change X?"  | `.claude/skills/gitnexus/gitnexus-impact-analysis/SKILL.md` |
+| Trace bugs / "Why is X failing?"             | `.claude/skills/gitnexus/gitnexus-debugging/SKILL.md`       |
+| Rename / extract / split / refactor          | `.claude/skills/gitnexus/gitnexus-refactoring/SKILL.md`     |
+| Tools, resources, schema reference           | `.claude/skills/gitnexus/gitnexus-guide/SKILL.md`           |
+| Index, status, clean, wiki CLI commands      | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md`             |
 
 <!-- gitnexus:end -->

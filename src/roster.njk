@@ -23,21 +23,28 @@ eleventyExcludeFromCollections: true
       <span class="logo-dare">D.A.R.E.</span>
       <span class="logo-sub">Roster Console</span>
     </a>
-    <button id="logoutBtn" class="btn btn-outline btn-small hidden">Log Out</button>
+    <button id="logoutBtn" class="btn btn-outline btn-small hidden">Sign Out</button>
   </header>
 
-  <!-- Login view -->
-  <main id="loginView" class="roster-login hidden">
-    <form id="loginForm" class="roster-login-card">
-      <h1>Admin Login</h1>
-      <p>Enter the admin password to manage the volunteer roster.</p>
-      <div class="form-group">
-        <label for="password">Password</label>
-        <input type="password" id="password" name="password" autocomplete="current-password" required>
+  <!-- Coordinator access state -->
+  <main id="loadingView" class="roster-login">
+    <section class="roster-login-card" aria-live="polite">
+      <h1>Checking coordinator access</h1>
+      <p>Please wait while the Roster Console verifies your Volunteer Portal account.</p>
+    </section>
+  </main>
+
+  <main id="accessView" class="roster-login hidden">
+    <section class="roster-login-card" aria-labelledby="accessHeading">
+      <h1 id="accessHeading">Coordinator access required</h1>
+      <p id="accessMessage">
+        This account does not have permission to use the Roster Console.
+      </p>
+      <div class="roster-access-actions">
+        <a href="/portal/" class="btn btn-primary btn-full">Back to Volunteer Portal</a>
+        <button id="accessLogout" type="button" class="btn btn-outline btn-full">Sign Out</button>
       </div>
-      <button type="submit" class="btn btn-primary btn-full">Log In</button>
-      <p id="loginError" class="form-error hidden">Incorrect password. Please try again.</p>
-    </form>
+    </section>
   </main>
 
   <!-- Console view -->
@@ -255,6 +262,7 @@ eleventyExcludeFromCollections: true
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-  <script src="/js/roster.js" defer></script>
+  {% include "identity-importmap.njk" %}
+  <script type="module" src="/js/roster.js"></script>
 </body>
 </html>
