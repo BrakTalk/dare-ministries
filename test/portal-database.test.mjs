@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { fileURLToPath } from 'node:url';
 import { NetlifyDB } from '@netlify/database-dev';
 import {
   fallbackName,
@@ -9,6 +10,8 @@ import {
   publicProfile,
 } from '../netlify/functions/lib/portal-auth.mjs';
 import { mergePortalIdentityRoles } from '../netlify/functions/admin-user-profiles.mjs';
+
+const migrationsDir = fileURLToPath(new URL('../netlify/database/migrations/', import.meta.url));
 
 test('portal authorization helpers recognize only coordinator roles', () => {
   assert.equal(identityIsCoordinator({ roles: ['member'] }), false);
@@ -66,7 +69,7 @@ test('all database migrations apply and portal profile constraints hold', async 
   await db.start();
 
   try {
-    const migrations = await db.applyMigrations('netlify/database/migrations');
+    const migrations = await db.applyMigrations(migrationsDir);
     assert.ok(migrations.some((name) => name.includes('create_user_profiles')));
 
     const inserted = await db.query(
