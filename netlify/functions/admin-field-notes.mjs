@@ -39,7 +39,7 @@ async function insertWithUniqueSlug(db, { title, startDate, endDate, body }) {
 }
 
 export default async (req) => {
-  const unauthorized = requireAuth(req);
+  const unauthorized = await requireAuth(req);
   if (unauthorized) return unauthorized;
 
   const db = getDatabase();

@@ -20,7 +20,7 @@ async function rebuildIfPublished(db, noteId) {
 }
 
 export default async (req) => {
-  const unauthorized = requireAuth(req);
+  const unauthorized = await requireAuth(req);
   if (unauthorized) return unauthorized;
 
   const db = getDatabase();

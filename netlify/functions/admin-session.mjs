@@ -4,7 +4,8 @@ import {
   checkPassword,
   createSessionCookie,
   clearSessionCookie,
-  isAuthenticated,
+  requireActiveCoordinator,
+  requireAuth,
 } from './lib/auth.mjs';
 
 export const config = { path: ['/api/admin/login', '/api/admin/logout'] };
@@ -19,8 +20,9 @@ export default async (req) => {
 
   // /api/admin/login
   if (req.method === 'GET') {
-    // Lets the console check whether an existing session is still valid.
-    return json({ authenticated: isAuthenticated(req) });
+    // A shared-password cookie is only valid while the current Identity user
+    // remains an active coordinator in the portal database.
+    return json({ authenticated: !(await requireAuth(req)) });
   }
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
@@ -30,6 +32,9 @@ export default async (req) => {
     await new Promise((r) => setTimeout(r, 800));
     return json({ error: 'Incorrect password' }, 401);
   }
+
+  const unauthorized = await requireActiveCoordinator();
+  if (unauthorized) return unauthorized;
 
   return json({ ok: true }, 200, { 'Set-Cookie': createSessionCookie() });
 };

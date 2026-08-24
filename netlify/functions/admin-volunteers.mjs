@@ -8,7 +8,7 @@ export const config = { path: '/api/admin/volunteers' };
 const STATUSES = ['new', 'contacted', 'active', 'inactive'];
 
 export default async (req) => {
-  const unauthorized = requireAuth(req);
+  const unauthorized = await requireAuth(req);
   if (unauthorized) return unauthorized;
 
   const db = getDatabase();

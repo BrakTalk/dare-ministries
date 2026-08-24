@@ -15,7 +15,7 @@ const FIELDS = [
 ];
 
 export default async (req) => {
-  const unauthorized = requireAuth(req);
+  const unauthorized = await requireAuth(req);
   if (unauthorized) return unauthorized;
 
   if (req.method !== 'PUT') return json({ error: 'Method not allowed' }, 405);

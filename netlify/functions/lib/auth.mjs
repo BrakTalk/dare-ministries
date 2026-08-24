@@ -4,6 +4,7 @@
 // admin credential for DARE leadership.
 
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { getPortalSession } from './portal-auth.mjs';
 
 const COOKIE_NAME = 'dare_admin_session';
 const SESSION_DAYS = 7;
@@ -56,11 +57,21 @@ export function isAuthenticated(req) {
   }
 }
 
-// Returns a 401 Response when the request has no valid session, else null.
-export function requireAuth(req) {
-  if (isAuthenticated(req)) return null;
-  return new Response(JSON.stringify({ error: 'Not authenticated' }), {
-    status: 401,
-    headers: { 'Content-Type': 'application/json' },
-  });
+// The shared admin password remains a second factor for the legacy console,
+// but it must never bypass the Volunteer Portal's authoritative profile state.
+export async function requireActiveCoordinator() {
+  const session = await getPortalSession({ activeOnly: true, role: 'coordinator' });
+  return session.response || null;
+}
+
+// Returns an error Response unless both the shared admin session and an active
+// coordinator Identity/profile session are present.
+export async function requireAuth(req) {
+  if (!isAuthenticated(req)) {
+    return new Response(JSON.stringify({ error: 'Not authenticated' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  return requireActiveCoordinator();
 }
