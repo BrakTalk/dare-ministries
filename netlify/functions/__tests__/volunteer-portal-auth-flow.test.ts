@@ -211,6 +211,27 @@ function portalRequest(method = 'GET', headers: Record<string, string> = {}) {
   return new Request('https://whofixedtheroof.com/api/portal/profile', { method, headers });
 }
 
+function portalPatchRequest(body: Record<string, unknown>, origin = 'https://whofixedtheroof.com') {
+  const request = new Request('https://whofixedtheroof.com/api/portal/profile', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  // happy-dom follows the browser rule that scripts cannot set the forbidden
+  // Origin header. Netlify supplies it to the function, so model that platform
+  // boundary explicitly while retaining the real Request body parser.
+  Object.defineProperty(request, 'headers', {
+    value: {
+      get(name: string) {
+        if (name.toLowerCase() === 'origin') return origin;
+        if (name.toLowerCase() === 'content-type') return 'application/json';
+        return null;
+      },
+    },
+  });
+  return request;
+}
+
 function deferred() {
   let release!: () => void;
   const promise = new Promise<void>((resolve) => (release = resolve));
@@ -691,6 +712,99 @@ describe('Phase B: authenticated session and profile provisioning', () => {
 
     expect(session.response).toBeUndefined();
     expect(session.profile).toMatchObject({ status: 'active', role: 'coordinator' });
+  });
+
+  it('✅ B13 permits a pending member to update their own profile', async () => {
+    seedProfile({ status: 'pending', role: 'member' });
+    state.identityUser = MEMBER;
+
+    const response = await portalProfileHandler(
+      portalPatchRequest({
+        display_name: '  Updated Volunteer  ',
+        phone: ' 555-0199 ',
+        organization: ' Recovery Team ',
+        request_reason: ' Available on weekends. ',
+      })
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.profile).toMatchObject({
+      display_name: 'Updated Volunteer',
+      phone: '555-0199',
+      organization: 'Recovery Team',
+      request_reason: 'Available on weekends.',
+      status: 'pending',
+    });
+    expect(
+      state.dbCalls.filter((call) => /UPDATE user_profiles SET display_name/.test(call.text))
+    ).toHaveLength(1);
+  });
+
+  it('✅ B14 permits an active member to update their own profile without changing access', async () => {
+    seedProfile({ status: 'active', role: 'member' });
+    state.identityUser = MEMBER;
+
+    const response = await portalProfileHandler(
+      portalPatchRequest({ display_name: 'Active Volunteer', phone: '555-0177' })
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.profile).toMatchObject({
+      display_name: 'Active Volunteer',
+      phone: '555-0177',
+      status: 'active',
+      role: 'member',
+    });
+    expect(
+      state.dbCalls.filter((call) => /UPDATE user_profiles SET display_name/.test(call.text))
+    ).toHaveLength(1);
+  });
+
+  it('🔒 B15 rejects a denied member profile update before issuing an UPDATE', async () => {
+    seedProfile({ status: 'denied', role: 'member' });
+    state.identityUser = MEMBER;
+
+    const response = await portalProfileHandler(
+      portalPatchRequest({ display_name: 'Denied Volunteer' })
+    );
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: 'This account cannot be edited.' });
+    expect(
+      state.dbCalls.filter((call) => /UPDATE user_profiles SET display_name/.test(call.text))
+    ).toHaveLength(0);
+  });
+
+  it('🔒 B16 rejects a suspended member profile update before issuing an UPDATE', async () => {
+    seedProfile({ status: 'suspended', role: 'member' });
+    state.identityUser = MEMBER;
+
+    const response = await portalProfileHandler(
+      portalPatchRequest({ display_name: 'Suspended Volunteer' })
+    );
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: 'This account cannot be edited.' });
+    expect(
+      state.dbCalls.filter((call) => /UPDATE user_profiles SET display_name/.test(call.text))
+    ).toHaveLength(0);
+  });
+
+  it('🔒 B17 rejects a cross-origin profile update before issuing an UPDATE', async () => {
+    seedProfile({ status: 'pending', role: 'member' });
+    state.identityUser = MEMBER;
+
+    const response = await portalProfileHandler(
+      portalPatchRequest({ display_name: 'Cross-Origin Attempt' }, 'https://attacker.example')
+    );
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: 'Request origin is not allowed.' });
+    expect(
+      state.dbCalls.filter((call) => /UPDATE user_profiles SET display_name/.test(call.text))
+    ).toHaveLength(0);
   });
 });
 

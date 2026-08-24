@@ -41,7 +41,7 @@ Runnable suite: `netlify/functions/__tests__/volunteer-portal-auth-flow.test.ts`
 - **Assumed:** the `identity_user_id` uniqueness constraint is present. The migration-level constraint is covered separately by `test/portal-database.test.mjs`; B4 covers the concurrent application behavior.
 - **Ambiguity:** the diagram says “show portal or account status.” The current site allows all authenticated users to open the portal shell to see their state, but private volunteer tools must remain unavailable until `active`.
 - **Ambiguity:** Netlify converts an uncaught database error into a platform 5xx response. D5 asserts no partial database record; C8 asserts the browser fails closed with a generic retry message rather than promising a specific Netlify error shape.
-- **Out of scope:** password reset, coordinator approval/deny/suspend UI actions, photo upload/management, and profile editing are separate sequences and should receive their own suites.
+- **Out of scope:** password reset, coordinator approval/deny/suspend UI actions, and photo upload/management are separate sequences. B13–B17 cover the profile-edit authorization and write boundary; detailed field-validation behavior can be expanded in a dedicated profile-edit suite.
 
 ## Test cases by phase
 
@@ -258,6 +258,61 @@ Runnable suite: `netlify/functions/__tests__/volunteer-portal-auth-flow.test.ts`
 - Defects caught: over-restrictive guard, wrong order of reconciliation and authorization.
 - Notes: downstream coordinator endpoints must still use this guard.
 
+### B13 — Pending member updates own profile
+
+- Category: Profile update / authorization
+- Priority: P0
+- Type: Positive
+- Preconditions: verified profile is `pending/member`; request origin matches the site.
+- Steps: PATCH trimmed and untrimmed contact/profile fields to `/api/portal/profile`.
+- Expected: 200; one profile UPDATE; normalized fields persist while status remains pending.
+- Defects caught: pending users unable to correct an application, untrimmed data, access status changed by profile editing.
+- Notes: the handler identifies the profile from the verified session, not a browser-supplied ID.
+
+### B14 — Active member updates own profile
+
+- Category: Profile update / authorization
+- Priority: P0
+- Type: Positive
+- Preconditions: verified profile is `active/member`; same-origin request.
+- Steps: PATCH valid profile fields.
+- Expected: 200; one profile UPDATE; new values persist while role/status remain `member/active`.
+- Defects caught: approved user unable to maintain contact details, profile edit resetting approval.
+- Notes: access state is not part of the accepted PATCH body.
+
+### B15 — Denied member cannot update profile
+
+- Category: Profile update / status gate
+- Priority: P0
+- Type: Security / negative
+- Preconditions: verified profile is `denied/member`; same-origin request.
+- Steps: PATCH a valid display name.
+- Expected: 403 `This account cannot be edited.`; no profile UPDATE is issued.
+- Defects caught: denied accounts mutating profile data despite the documented status gate.
+- Notes: the session upsert/load may still occur before the status decision.
+
+### B16 — Suspended member cannot update profile
+
+- Category: Profile update / suspension
+- Priority: P0
+- Type: Security / negative
+- Preconditions: verified profile is `suspended/member`; same-origin request.
+- Steps: PATCH a valid display name.
+- Expected: 403 `This account cannot be edited.`; no profile UPDATE is issued.
+- Defects caught: suspension enforced only for private tools while profile writes remain open.
+- Notes: this complements the active-only feature gate in B10.
+
+### B17 — Cross-origin profile update is rejected
+
+- Category: CSRF / trust boundary
+- Priority: P0
+- Type: Security / negative
+- Preconditions: verified pending member; `Origin` names a different site.
+- Steps: PATCH an otherwise valid profile update.
+- Expected: 403 origin error before any profile UPDATE.
+- Defects caught: another website causing authenticated profile changes, origin validation running after the write.
+- Notes: same-origin validation precedes both the status gate and request-body handling.
+
 ## Phase C — Portal display and access status
 
 ### C1 — Pending status view
@@ -429,11 +484,11 @@ Runnable suite: `netlify/functions/__tests__/volunteer-portal-auth-flow.test.ts`
 
 ## Cross-cutting coverage summary
 
-- **Security:** B1, B5, B7–B11, C4, C6–C9, D3–D4, D6.
+- **Security:** B1, B5, B7–B11, B15–B17, C4, C6–C9, D3–D4, D6.
 - **Resilience / partial failure:** A7, C8–C9, D2, D5.
 - **Concurrency / idempotency:** B3–B4; database constraint coverage remains in `test/portal-database.test.mjs`.
-- **Input boundaries:** A1, A3–A4, B8–B9.
-- **Account states:** B2, B6–B7, B10–B12, C1–C5.
+- **Input boundaries:** A1, A3–A4, B8–B9, B13–B14, B17.
+- **Account states:** B2, B6–B7, B10–B16, C1–C5.
 - **File/subprocess/stream/blob behavior:** deliberately absent and regression-checked by D6 because those systems are not participants in this sequence.
 
 ## Observability expectations
@@ -457,4 +512,4 @@ Runnable suite: `netlify/functions/__tests__/volunteer-portal-auth-flow.test.ts`
 - [ ] Portal UI fails closed for 401, 5xx, and malformed payloads.
 - [ ] User-facing errors do not reveal provider internals or whether an account email exists beyond the intended duplicate-registration guidance.
 - [ ] Authentication code has no dependency on the photo-management system.
-- [ ] Runnable tests keep one `it(...)` per A1–A7, B1–B12, C1–C9, and D1–D6 case and complete without network/disk side effects.
+- [ ] Runnable tests keep one `it(...)` per A1–A7, B1–B17, C1–C9, and D1–D6 case and complete without network/disk side effects.
