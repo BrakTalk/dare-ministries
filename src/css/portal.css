@@ -313,6 +313,12 @@
   color: var(--color-white);
 }
 
+.portal-nav button:focus-visible,
+.portal-nav a:focus-visible {
+  outline: 3px solid var(--color-accent-light);
+  outline-offset: 2px;
+}
+
 .portal-main {
   width: 100%;
   max-width: 1180px;
