@@ -74,6 +74,7 @@ vi.mock('@netlify/database', () => ({ getDatabase: state.getDatabase }));
 
 import identityHandler from '../identity.mjs';
 import portalProfileHandler from '../portal-profile.mjs';
+import { NOTIFY_TIMEOUT_MS } from '../lib/helpers.mjs';
 import { getOrCreateProfile, getPortalSession } from '../lib/portal-auth.mjs';
 
 const NOW = '2026-08-23T12:00:00.000Z';
@@ -426,6 +427,9 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  delete process.env.RESEND_API_KEY;
+  delete process.env.NOTIFY_EMAIL;
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -1009,5 +1013,58 @@ describe('Phase D: account lifecycle and cross-cutting safeguards', () => {
 
     expect(source).not.toMatch(/node:fs|child_process|node:stream|@netlify\/blobs|getStore\s*\(/);
     expect(source).not.toMatch(/field_note_photos|field-photos|BUILD_HOOK_URL/);
+  });
+
+  it('⚠️ D7 aborts a stalled signup notification without rejecting Identity signup', async () => {
+    vi.useFakeTimers();
+    process.env.RESEND_API_KEY = 'resend-test-key';
+    process.env.NOTIFY_EMAIL = 'coordinator@example.com';
+    let signal: AbortSignal | undefined;
+    const fetchMock = vi.fn((_url: string, init: RequestInit = {}) => {
+      signal = init.signal as AbortSignal;
+      return new Promise<Response>((_resolve, reject) => {
+        signal?.addEventListener(
+          'abort',
+          () => reject(new DOMException('The notification timed out.', 'AbortError')),
+          { once: true }
+        );
+      });
+    });
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    vi.stubGlobal('fetch', fetchMock);
+
+    const signup = identityHandler.userSignup({ user: MEMBER });
+    await flush();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(NOTIFY_TIMEOUT_MS);
+    const result = await signup;
+
+    expect(signal?.aborted).toBe(true);
+    expect(result?.user.appMetadata?.roles).toEqual(['pending']);
+    expect(errorSpy).toHaveBeenCalledWith(
+      'Notification email timed out:',
+      expect.objectContaining({ name: 'AbortError' })
+    );
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('✅ D8 clears the notification timeout after a successful signup email', async () => {
+    vi.useFakeTimers();
+    process.env.RESEND_API_KEY = 'resend-test-key';
+    process.env.NOTIFY_EMAIL = 'coordinator@example.com';
+    let signal: AbortSignal | undefined;
+    const fetchMock = vi.fn(async (_url: string, init: RequestInit = {}) => {
+      signal = init.signal as AbortSignal;
+      return new Response('', { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await identityHandler.userSignup({ user: MEMBER });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(signal).toBeInstanceOf(AbortSignal);
+    expect(signal?.aborted).toBe(false);
+    expect(result?.user.appMetadata?.roles).toEqual(['pending']);
+    expect(vi.getTimerCount()).toBe(0);
   });
 });

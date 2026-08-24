@@ -31,6 +31,7 @@ Runnable suite: `netlify/functions/__tests__/volunteer-portal-auth-flow.test.ts`
 - PortalAPI → Database: one profile upsert/load per authenticated portal request.
 - PortalAPI → Browser: a no-store public profile containing the access status used by the UI.
 - Confirmed-signup and account-deletion Identity hooks create/suspend the corresponding database profile.
+- Confirmed signup → Resend: the optional coordinator notification is bounded to five seconds and cannot block signup indefinitely.
 - This sequence has no photo bytes, file writes, blob storage, subprocesses, streams, or build hooks. Photo management remains outside this authentication suite, and its existing behavior is unchanged by this work.
 
 ## Assumptions and ambiguities
@@ -482,10 +483,32 @@ Runnable suite: `netlify/functions/__tests__/volunteer-portal-auth-flow.test.ts`
 - Defects caught: authentication unexpectedly mutating unrelated photo infrastructure or invoking unsafe host I/O.
 - Notes: future photo upload must be introduced through a separately permission-gated, separately tested sequence.
 
+### D7 — Stalled signup notification times out safely
+
+- Category: External-service timeout / resilience
+- Priority: P0
+- Type: Failure / edge
+- Preconditions: signup profile write succeeds; Resend is configured but its request never completes.
+- Steps: execute `userSignup`; advance through the notification timeout.
+- Expected: Resend request receives an abort signal; timeout is logged; the timer is cleared; signup still returns pending Identity metadata.
+- Defects caught: Identity signup hanging until the function deadline, notification failure rejecting account creation, leaked timer.
+- Notes: the profile remains available even though the coordinator email was not delivered.
+
+### D8 — Successful signup notification clears timeout
+
+- Category: External-service lifecycle
+- Priority: P1
+- Type: Positive / cleanup
+- Preconditions: Resend is configured and responds successfully before the deadline.
+- Steps: execute `userSignup` with a successful notification response.
+- Expected: request receives a non-aborted signal; signup returns pending metadata; no timeout timer remains.
+- Defects caught: timer firing after success, unnecessary abort/log noise, signup result lost after notification.
+- Notes: this covers the normal cleanup path paired with D7's timeout path.
+
 ## Cross-cutting coverage summary
 
 - **Security:** B1, B5, B7–B11, B15–B17, C4, C6–C9, D3–D4, D6.
-- **Resilience / partial failure:** A7, C8–C9, D2, D5.
+- **Resilience / partial failure:** A7, C8–C9, D2, D5, D7–D8.
 - **Concurrency / idempotency:** B3–B4; database constraint coverage remains in `test/portal-database.test.mjs`.
 - **Input boundaries:** A1, A3–A4, B8–B9, B13–B14, B17.
 - **Account states:** B2, B6–B7, B10–B16, C1–C5.
@@ -495,6 +518,7 @@ Runnable suite: `netlify/functions/__tests__/volunteer-portal-auth-flow.test.ts`
 
 - Identity authentication failures should remain user-safe; provider details should be available through Netlify function/Identity logs, not rendered to the visitor.
 - Confirmed-signup database failures must log `Could not pre-create portal profile at signup` with the underlying error (D2).
+- Resend timeouts must log `Notification email timed out` without rejecting the Identity hook (D7); successful notification requests must leave no timeout behind (D8).
 - Netlify should record function status/latency for `/api/portal/profile`; alerting should distinguish elevated 401s from 5xx database/platform failures.
 - Database monitoring should track upsert failures and unique-constraint errors. A unique error on this path would indicate the `ON CONFLICT` contract has regressed.
 - Coordinator decisions and suspensions are recorded by the separate account-review API/audit-log sequence; this authentication suite verifies only that resulting status is enforced.
@@ -511,5 +535,6 @@ Runnable suite: `netlify/functions/__tests__/volunteer-portal-auth-flow.test.ts`
 - [ ] Unauthenticated responses stop before database access and all profile/session responses remain `no-store`.
 - [ ] Portal UI fails closed for 401, 5xx, and malformed payloads.
 - [ ] User-facing errors do not reveal provider internals or whether an account email exists beyond the intended duplicate-registration guidance.
+- [ ] Optional Resend notifications use an abort signal, a bounded timeout, and `finally` cleanup without rejecting signup.
 - [ ] Authentication code has no dependency on the photo-management system.
-- [ ] Runnable tests keep one `it(...)` per A1–A7, B1–B17, C1–C9, and D1–D6 case and complete without network/disk side effects.
+- [ ] Runnable tests keep one `it(...)` per A1–A7, B1–B17, C1–C9, and D1–D8 case and complete without network/disk side effects.
