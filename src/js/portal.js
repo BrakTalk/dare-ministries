@@ -41,9 +41,10 @@ function statusLabel(status) {
 }
 
 function renderProfile() {
-  const firstName = profile.display_name.split(/\s+/)[0] || profile.display_name;
-  $('headerMemberName').textContent = profile.display_name;
-  $('sidebarMemberName').textContent = profile.display_name;
+  const displayName = profile.display_name || profile.email || 'Portal member';
+  const firstName = displayName.split(/\s+/)[0] || displayName;
+  $('headerMemberName').textContent = displayName;
+  $('sidebarMemberName').textContent = displayName;
   $('sidebarMemberEmail').textContent = profile.email;
   $('dashboardMemberName').textContent = firstName;
 
