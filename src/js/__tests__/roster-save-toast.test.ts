@@ -16,6 +16,10 @@ import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const rosterSource = readFileSync(resolve(here, '../roster.js'), 'utf8');
+const executableRosterSource = rosterSource.replace(
+  /import\s*\{\s*logout\s*\}\s*from\s*['"]\/js\/vendor\/netlify-identity\.js['"];?\s*/,
+  ''
+);
 const rosterMarkup = (() => {
   const html = readFileSync(resolve(here, '../../roster.njk'), 'utf8');
   const body = html.match(/<body[^>]*>([\s\S]*)<\/body>/);
@@ -55,6 +59,7 @@ let failNext: FailNext | null = null;
 let holdNext: { method: string; urlPart: string; gate: Promise<void> } | null = null;
 let afterPatch: (() => void) | null = null;
 let idSeq = 0;
+let mockLogout: ReturnType<typeof vi.fn>;
 
 function makeNote(overrides: Partial<NoteRecord> = {}): NoteRecord {
   idSeq += 1;
@@ -90,7 +95,12 @@ const mockFetch = vi.fn(async (url: string, init: RequestInit = {}) => {
     return jsonRes({ error: f.error ?? 'boom' }, f.status);
   }
 
-  if (url.startsWith('/api/admin/login')) return jsonRes({ authenticated: true });
+  if (url.startsWith('/api/admin/session')) {
+    return jsonRes({
+      authenticated: true,
+      profile: { status: 'active', role: 'coordinator' },
+    });
+  }
   if (url.startsWith('/api/admin/volunteers')) return jsonRes([]);
   if (url.startsWith('/api/admin/contacts')) return jsonRes([]);
   if (url.startsWith('/api/impact-stats')) return jsonRes({});
@@ -148,7 +158,7 @@ async function boot(seed: NoteRecord[] = []) {
       nativeAdd(...args);
     });
   try {
-    new Function(rosterSource)();
+    new Function('logout', executableRosterSource)(mockLogout);
   } finally {
     addSpy.mockRestore();
   }
@@ -199,8 +209,13 @@ beforeEach(() => {
   holdNext = null;
   afterPatch = null;
   idSeq = 0;
+  mockLogout = vi.fn(async () => undefined);
+  window.history.replaceState(null, '', '/roster/');
   vi.stubGlobal('fetch', mockFetch);
-  vi.stubGlobal('confirm', vi.fn(() => true));
+  vi.stubGlobal(
+    'confirm',
+    vi.fn(() => true)
+  );
 });
 
 afterEach(() => {
@@ -298,7 +313,12 @@ describe('Phase A: submission and validation (noteForm → saveNote)', () => {
     const note = makeNote();
     await boot([note]);
     openFromList(note.id);
-    failNext = { method: 'PATCH', urlPart: '/api/admin/field-notes', status: 500, error: 'db exploded' };
+    failNext = {
+      method: 'PATCH',
+      urlPart: '/api/admin/field-notes',
+      status: 500,
+      error: 'db exploded',
+    };
     await submitForm();
 
     expect(hidden('noteOverlay')).toBe(false);
@@ -308,20 +328,37 @@ describe('Phase A: submission and validation (noteForm → saveNote)', () => {
     expect(($('noteSaveBtn') as HTMLButtonElement).disabled).toBe(false);
   });
 
-  it('⚠️ SAVE-A7 401 mid-save drops to the login view (modal-over-login quirk pinned)', async () => {
+  it('⚠️ SAVE-A7 401 mid-save closes private UI and returns to coordinator sign-in', async () => {
     const note = makeNote();
     await boot([note]);
     openFromList(note.id);
     failNext = { method: 'PATCH', urlPart: '/api/admin/field-notes', status: 401 };
     await submitForm();
 
-    expect(hidden('loginView')).toBe(false);
     expect(hidden('consoleView')).toBe(true);
     expect(hidden('toast')).toBe(true);
     expect($('noteError').textContent).toBe('Save failed: Not authenticated');
-    // Current behavior: the overlay lives outside #consoleView, so it stays
-    // visible on top of the login screen. A future fix should flip this.
-    expect(hidden('noteOverlay')).toBe(false);
+    expect(hidden('noteOverlay')).toBe(true);
+    expect(window.location.pathname).toBe('/login/');
+    expect(new URLSearchParams(window.location.search).get('next')).toBe('/roster/');
+  });
+
+  it('🔒 SAVE-A8 403 mid-save closes private UI and shows coordinator denial', async () => {
+    const note = makeNote();
+    await boot([note]);
+    openFromList(note.id);
+    failNext = {
+      method: 'PATCH',
+      urlPart: '/api/admin/field-notes',
+      status: 403,
+      error: 'Coordinator role removed.',
+    };
+    await submitForm();
+
+    expect(hidden('consoleView')).toBe(true);
+    expect(hidden('noteOverlay')).toBe(true);
+    expect(hidden('accessView')).toBe(false);
+    expect($('accessMessage').textContent).toBe('Coordinator role removed.');
   });
 });
 
@@ -429,7 +466,12 @@ describe('Phase C: later save (close modal + toast)', () => {
     await boot([note]);
     openFromList(note.id);
     fillForm({ body: 'This write will land' });
-    failNext = { method: 'GET', urlPart: '/api/admin/field-notes', status: 500, error: 'refresh died' };
+    failNext = {
+      method: 'GET',
+      urlPart: '/api/admin/field-notes',
+      status: 500,
+      error: 'refresh died',
+    };
     await submitForm();
 
     // The PATCH landed…
@@ -532,7 +574,10 @@ describe('Phase E: publish/cancel guard rails', () => {
   it('❌ SAVE-E2 declining the unpublish confirm sends nothing', async () => {
     const note = makeNote({ status: 'published' });
     await boot([note]);
-    vi.stubGlobal('confirm', vi.fn(() => false));
+    vi.stubGlobal(
+      'confirm',
+      vi.fn(() => false)
+    );
     openFromList(note.id);
     $('notePublishBtn').click();
     await flush();
@@ -573,5 +618,64 @@ describe('Cross-cutting security', () => {
     const name = document.querySelector('#noteList .contact-name')!;
     expect(name.textContent).toBe(payload);
     expect((window as unknown as Record<string, unknown>).__pwned).toBeUndefined();
+  });
+});
+
+describe('Coordinator session UI', () => {
+  it('❌ AUTH-UI1 redirects an anonymous roster visit to the shared login page', async () => {
+    failNext = {
+      method: 'GET',
+      urlPart: '/api/admin/session',
+      status: 401,
+      error: 'Please sign in to continue.',
+    };
+
+    await boot();
+
+    expect(window.location.pathname).toBe('/login/');
+    expect(new URLSearchParams(window.location.search).get('next')).toBe('/roster/');
+    expect(hidden('consoleView')).toBe(true);
+  });
+
+  it('🔒 AUTH-UI2 shows an access state for a signed-in non-coordinator', async () => {
+    failNext = {
+      method: 'GET',
+      urlPart: '/api/admin/session',
+      status: 403,
+      error: 'You do not have permission to use this area.',
+    };
+
+    await boot();
+
+    expect(window.location.pathname).toBe('/roster/');
+    expect(hidden('accessView')).toBe(false);
+    expect(hidden('consoleView')).toBe(true);
+    expect($('accessMessage').textContent).toBe('You do not have permission to use this area.');
+  });
+
+  it('⚠️ AUTH-UI3 distinguishes an authorization outage from a denied account', async () => {
+    failNext = {
+      method: 'GET',
+      urlPart: '/api/admin/session',
+      status: 500,
+      error: 'database unavailable',
+    };
+
+    await boot();
+
+    expect(hidden('accessView')).toBe(false);
+    expect($('accessHeading').textContent).toBe('Roster Console unavailable');
+    expect($('accessMessage').textContent).toContain('could not be checked');
+  });
+
+  it('✅ AUTH-UI4 signs out through Netlify Identity', async () => {
+    await boot();
+
+    $('logoutBtn').click();
+    await flush();
+
+    expect(mockLogout).toHaveBeenCalledTimes(1);
+    expect(window.location.pathname).toBe('/login/');
+    expect(new URLSearchParams(window.location.search).get('signedOut')).toBe('1');
   });
 });

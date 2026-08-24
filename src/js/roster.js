@@ -1,7 +1,8 @@
 // D.A.R.E. Ministries — Roster Admin Console
-// Talks to the /api/admin/* Netlify Functions. Auth is a signed HttpOnly
-// session cookie; every response is checked for 401 so an expired session
-// drops back to the login view.
+// Talks to the /api/admin/* Netlify Functions. Netlify Identity proves who the
+// visitor is, and every private response revalidates active coordinator access.
+
+import { logout } from '/js/vendor/netlify-identity.js';
 
 (function () {
   'use strict';
@@ -13,6 +14,9 @@
   let sortKey = 'created_at';
   let sortDir = 'desc';
   let currentDetail = null;
+  let authRedirecting = false;
+
+  const LOGIN_URL = '/login/?next=%2Froster%2F';
 
   // ─── API helper ─────────────────────────────────────────────────────────────
 
@@ -21,15 +25,23 @@
       headers: { 'Content-Type': 'application/json' },
       ...options,
     });
+    const body = await res.json().catch(() => ({}));
     if (res.status === 401) {
-      showLogin();
-      throw new Error('Not authenticated');
+      redirectToLogin();
+      const error = new Error('Not authenticated');
+      error.status = 401;
+      throw error;
+    }
+    if (res.status === 403) {
+      showAccessDenied(body.error);
+      const error = new Error('Coordinator access required');
+      error.status = 403;
+      throw error;
     }
     if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
       throw new Error(body.error || 'Request failed (' + res.status + ')');
     }
-    return res.json();
+    return body;
   }
 
   // Escapes for BOTH text and quoted-attribute contexts: the textContent
@@ -62,17 +74,54 @@
 
   // ─── Views ──────────────────────────────────────────────────────────────────
 
-  function showLogin() {
-    $('loginView').classList.remove('hidden');
+  function closePrivateOverlays() {
+    ['detailOverlay', 'addOverlay', 'noteOverlay', 'toast'].forEach((id) =>
+      $(id).classList.add('hidden')
+    );
+    currentDetail = null;
+    currentNote = null;
+  }
+
+  function redirectToLogin() {
+    closePrivateOverlays();
+    $('loadingView').classList.add('hidden');
+    $('accessView').classList.add('hidden');
     $('consoleView').classList.add('hidden');
     $('logoutBtn').classList.add('hidden');
+    if (!authRedirecting) {
+      authRedirecting = true;
+      window.location.assign(LOGIN_URL);
+    }
+  }
+
+  function showAccessDenied(message) {
+    closePrivateOverlays();
+    $('loadingView').classList.add('hidden');
+    $('consoleView').classList.add('hidden');
+    $('logoutBtn').classList.add('hidden');
+    $('accessHeading').textContent = 'Coordinator access required';
+    $('accessMessage').textContent =
+      message || 'This account does not have permission to use the Roster Console.';
+    $('accessView').classList.remove('hidden');
+  }
+
+  function showAccessUnavailable() {
+    closePrivateOverlays();
+    $('loadingView').classList.add('hidden');
+    $('consoleView').classList.add('hidden');
+    $('logoutBtn').classList.add('hidden');
+    $('accessHeading').textContent = 'Roster Console unavailable';
+    $('accessMessage').textContent =
+      'Coordinator access could not be checked. Refresh the page or try again later.';
+    $('accessView').classList.remove('hidden');
   }
 
   // Loads panels independently — one failing panel must not read as an auth
   // failure or block the others. Session expiry is handled inside api() (401
-  // drops back to the login view), so this function never throws.
+  // returns to centralized sign-in), so this function never throws.
   async function showConsole() {
-    $('loginView').classList.add('hidden');
+    $('loadingView').classList.add('hidden');
+    $('accessView').classList.add('hidden');
     $('consoleView').classList.remove('hidden');
     $('logoutBtn').classList.remove('hidden');
 
@@ -96,40 +145,21 @@
 
   // ─── Auth ───────────────────────────────────────────────────────────────────
 
-  $('loginForm').addEventListener('submit', async function (e) {
-    e.preventDefault();
-    $('loginError').classList.add('hidden');
-    const btn = this.querySelector('button');
-    btn.disabled = true;
-    btn.textContent = 'Logging in…';
-    // Only the login request itself may trigger the password error —
-    // post-auth data loading has its own error handling in showConsole().
-    let loggedIn = false;
+  async function signOut(button) {
+    button.disabled = true;
     try {
-      await api('/api/admin/login', {
-        method: 'POST',
-        body: JSON.stringify({ password: $('password').value }),
-      });
-      loggedIn = true;
+      await logout();
     } catch {
-      $('loginError').classList.remove('hidden');
-    } finally {
-      btn.disabled = false;
-      btn.textContent = 'Log In';
+      // Navigate away even if server-side session invalidation is unavailable.
     }
-    if (loggedIn) {
-      $('password').value = '';
-      await showConsole();
-    }
-  });
+    window.location.replace('/login/?signedOut=1');
+  }
 
-  $('logoutBtn').addEventListener('click', async function () {
-    try {
-      await api('/api/admin/logout', { method: 'POST' });
-    } catch {
-      /* session is gone either way */
-    }
-    showLogin();
+  $('logoutBtn').addEventListener('click', function () {
+    signOut(this);
+  });
+  $('accessLogout').addEventListener('click', function () {
+    signOut(this);
   });
 
   // ─── Tabs ───────────────────────────────────────────────────────────────────
@@ -726,7 +756,12 @@
   $('notePublishBtn').addEventListener('click', async function () {
     if (!currentNote) return;
     const publishing = currentNote.status !== 'published';
-    if (!publishing && !confirm('Unpublish this entry? It will be removed from the public site after the next rebuild.')) {
+    if (
+      !publishing &&
+      !confirm(
+        'Unpublish this entry? It will be removed from the public site after the next rebuild.'
+      )
+    ) {
       return;
     }
     this.disabled = true;
@@ -742,7 +777,8 @@
 
   $('noteDeleteBtn').addEventListener('click', async function () {
     if (!currentNote) return;
-    if (!confirm('Delete "' + currentNote.title + '" and its photos? This cannot be undone.')) return;
+    if (!confirm('Delete "' + currentNote.title + '" and its photos? This cannot be undone.'))
+      return;
     this.disabled = true;
     try {
       await api('/api/admin/field-notes', {
@@ -874,7 +910,12 @@
           { method: 'POST', headers: { 'Content-Type': blob.type }, body: blob }
         );
         if (res.status === 401) {
-          showLogin();
+          redirectToLogin();
+          return;
+        }
+        if (res.status === 403) {
+          const body = await res.json().catch(() => ({}));
+          showAccessDenied(body.error);
           return;
         }
         if (!res.ok) {
@@ -893,16 +934,11 @@
   // ─── Boot ───────────────────────────────────────────────────────────────────
 
   (async function init() {
-    let authenticated = false;
     try {
-      ({ authenticated } = await api('/api/admin/login'));
-    } catch {
-      // Session check unreachable — treat as logged out.
-    }
-    if (authenticated) {
+      await api('/api/admin/session');
       await showConsole();
-    } else {
-      showLogin();
+    } catch (error) {
+      if (error.status !== 401 && error.status !== 403) showAccessUnavailable();
     }
   })();
 })();

@@ -43,6 +43,11 @@ function friendlyError(error) {
   return 'Something went wrong. Please try again.';
 }
 
+function signInDestination() {
+  const next = new URLSearchParams(window.location.search).get('next');
+  return next === '/roster/' ? '/roster/' : '/portal/';
+}
+
 async function processIdentityCallback() {
   if (!window.location.hash || !/_token=|access_token=/.test(window.location.hash)) return null;
 
@@ -77,7 +82,7 @@ const loginForm = document.getElementById('loginForm');
 if (loginForm && !callbackResult) {
   const existingUser = await getUser();
   if (existingUser) {
-    window.location.replace('/portal/');
+    window.location.replace(signInDestination());
   }
 
   const params = new URLSearchParams(window.location.search);
@@ -100,7 +105,7 @@ if (loginForm && !callbackResult) {
         document.getElementById('loginEmail').value.trim(),
         document.getElementById('loginPassword').value
       );
-      window.location.assign('/portal/');
+      window.location.assign(signInDestination());
     } catch (error) {
       setStatus(friendlyError(error), 'error');
       setFormBusy(loginForm, false);

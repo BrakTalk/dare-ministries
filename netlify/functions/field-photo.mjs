@@ -1,7 +1,7 @@
 // /images/field/:noteId/:photoId — serves field note photos from the Netlify
 // Blobs store. Photos of published notes are public with long-lived CDN
 // caching (immutable is safe: keys are write-once). Photos of draft notes are
-// only served to a valid admin session — the roster console previews draft
+// only served to an active coordinator — the roster console previews draft
 // thumbnails through this same route — with no-store so the CDN never caches
 // an authorized response for public reuse. Blobs with no matching metadata
 // row (orphans, deleted notes) are never served.
@@ -11,7 +11,7 @@
 import { getDatabase } from '@netlify/database';
 import { getStore } from '@netlify/blobs';
 import { FIELD_PHOTOS_STORE, isUuid } from './lib/helpers.mjs';
-import { isAuthenticated } from './lib/auth.mjs';
+import { requireAuth } from './lib/auth.mjs';
 
 export const config = { path: '/images/field/:noteId/:photoId' };
 
@@ -30,8 +30,14 @@ export default async (req, context) => {
   if (!rows.length) return new Response('Not found', { status: 404 });
 
   const published = rows[0].status === 'published';
-  if (!published && !isAuthenticated(req)) {
-    return new Response('Not found', { status: 404 });
+  if (!published) {
+    const unauthorized = await requireAuth(req);
+    if (unauthorized) {
+      return new Response('Not found', {
+        status: 404,
+        headers: { 'Cache-Control': 'private, no-store' },
+      });
+    }
   }
 
   const store = getStore(FIELD_PHOTOS_STORE);

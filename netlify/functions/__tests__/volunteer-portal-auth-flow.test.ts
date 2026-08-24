@@ -453,6 +453,34 @@ describe('Phase A: AuthClient sign in or register', () => {
     expect(window.location.pathname).toBe('/portal/');
   });
 
+  it('✅ A1b returns a coordinator to the roster after centralized sign-in', async () => {
+    window.history.replaceState(null, '', '/login/?next=%2Froster%2F');
+    loginMarkup();
+    const deps = authDependencies();
+    await runAuthClient(deps);
+    input('loginEmail').value = 'coordinator@example.com';
+    input('loginPassword').value = 'correct horse battery staple';
+
+    await submit('loginForm');
+
+    expect(window.location.pathname).toBe('/roster/');
+  });
+
+  it('🔒 A1c rejects external or unrecognized post-login destinations', async () => {
+    for (const next of ['https://attacker.example/', '//attacker.example/', '/admin/']) {
+      window.history.replaceState(null, '', '/login/?next=' + encodeURIComponent(next));
+      loginMarkup();
+      const deps = authDependencies();
+      await runAuthClient(deps);
+      input('loginEmail').value = 'coordinator@example.com';
+      input('loginPassword').value = 'correct horse battery staple';
+
+      await submit('loginForm');
+
+      expect(window.location.pathname).toBe('/portal/');
+    }
+  });
+
   it('❌ A2 keeps invalid credentials on the public login page with a safe message', async () => {
     loginMarkup();
     const deps = authDependencies({
