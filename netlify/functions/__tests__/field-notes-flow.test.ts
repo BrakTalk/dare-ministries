@@ -860,6 +860,7 @@ describe('Phase: Public photo serving (field-photo)', () => {
       params: { noteId: NOTE_ID, photoId: PHOTO_ID },
     });
     expect(res.status).toBe(404);
+    expect(res.headers.get('Cache-Control')).toBe('private, no-store');
     expect(state.store!.getWithMetadata).not.toHaveBeenCalled();
   });
 

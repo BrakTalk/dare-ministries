@@ -369,7 +369,7 @@ Generated from the publish-flow sequence diagram (Admin → RosterConsole → Ad
 
 - Category: Security (draft leakage) — P0 — Security
 - Preconditions: row exists, parent note `draft`, no active coordinator session
-- Expected: 404; blob store never queried
+- Expected: 404 with `Cache-Control: private, no-store`; blob store never queried
 - Defect(s): draft trip photos reachable at their public URL before publish
 
 ### S6 - Draft-note photo is served to an active coordinator with no-store caching

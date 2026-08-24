@@ -32,7 +32,12 @@ export default async (req, context) => {
   const published = rows[0].status === 'published';
   if (!published) {
     const unauthorized = await requireAuth(req);
-    if (unauthorized) return new Response('Not found', { status: 404 });
+    if (unauthorized) {
+      return new Response('Not found', {
+        status: 404,
+        headers: { 'Cache-Control': 'private, no-store' },
+      });
+    }
   }
 
   const store = getStore(FIELD_PHOTOS_STORE);
