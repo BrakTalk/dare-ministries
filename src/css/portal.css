@@ -486,6 +486,7 @@
 
 .portal-decision textarea {
   min-height: 72px;
+  padding: 0.75rem 0.85rem;
 }
 
 .portal-empty {
