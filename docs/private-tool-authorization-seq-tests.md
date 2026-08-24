@@ -21,7 +21,7 @@ Existing `volunteer-portal-auth-flow.test.ts` cases already cover the internal p
 - Missing/invalid shared authentication returns `401`. Missing Identity authentication also returns the `PortalAuth` `401`. Authenticated but inactive or non-coordinator profiles return `403`.
 - `PortalAuth` is authoritative and returns either `{ user, profile, db }` or `{ response }`. A malformed result must fail closed.
 - A `PortalAuth` exception is allowed to propagate to the Netlify runtime as a server failure; it must never be converted into authorization. Whether production should instead return a stable `503` is unresolved.
-- `GET /api/admin/login` intentionally collapses expired, revoked, and unavailable authorization into `{ authenticated: false }` for the console boot flow.
+- `GET /api/admin/login` intentionally collapses expired and revoked authorization into `{ authenticated: false }` for the console boot flow; PortalAuth exceptions propagate as described above.
 - Logout must remain available even if Identity or the database is unavailable so a stale shared cookie can always be cleared.
 - Authorization is checked on every request. There is no in-memory authorization cache, and duplicate requests are not assumed idempotent once downstream mutations begin.
 - The shared password remains a second factor rather than the primary account authorization mechanism. Long-term removal of this legacy factor is outside this phase.
