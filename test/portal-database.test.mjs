@@ -86,13 +86,22 @@ test('all database migrations apply and portal profile constraints hold', async 
       )
     );
 
-    const audit = await db.query(
-      `INSERT INTO portal_audit_log (target_profile_id, action, details)
-       VALUES ($1, $2, $3::JSONB)
-       RETURNING action`,
+    const decision = await db.query(
+      `WITH updated_profile AS (
+         UPDATE user_profiles SET status = 'active' WHERE id = $1 RETURNING *
+       ),
+       audit_entry AS (
+         INSERT INTO portal_audit_log (target_profile_id, action, details)
+         SELECT updated_profile.id, $2, $3::JSONB FROM updated_profile
+         RETURNING action
+       )
+       SELECT updated_profile.status, audit_entry.action AS audit_action
+       FROM updated_profile
+       CROSS JOIN audit_entry`,
       [inserted.rows[0].id, 'approve', JSON.stringify({ status: 'active' })]
     );
-    assert.equal(audit.rows[0].action, 'approve');
+    assert.equal(decision.rows[0].status, 'active');
+    assert.equal(decision.rows[0].audit_action, 'approve');
   } finally {
     await db.stop();
   }

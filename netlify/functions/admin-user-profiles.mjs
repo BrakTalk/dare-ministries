@@ -76,25 +76,35 @@ export default async (req) => {
     const action = ACTIONS[body.action];
     const decisionMessage = cleanText(body.decision_message, 1000);
     const rows = await session.db.sql`
-      UPDATE user_profiles
-      SET
-        status = ${action.status},
-        decision_message = ${decisionMessage},
-        reviewed_by = ${session.profile.id},
-        reviewed_at = NOW(),
-        updated_at = NOW()
-      WHERE id = ${target.id}
-      RETURNING *
-    `;
-
-    await session.db.sql`
-      INSERT INTO portal_audit_log (actor_profile_id, target_profile_id, action, details)
-      VALUES (
-        ${session.profile.id},
-        ${target.id},
-        ${body.action},
-        ${JSON.stringify({ status: action.status, decision_message: decisionMessage })}::JSONB
+      WITH updated_profile AS (
+        UPDATE user_profiles
+        SET
+          status = ${action.status},
+          decision_message = ${decisionMessage},
+          reviewed_by = ${session.profile.id},
+          reviewed_at = NOW(),
+          updated_at = NOW()
+        WHERE id = ${target.id}
+        RETURNING *
+      ),
+      audit_entry AS (
+        INSERT INTO portal_audit_log (
+          actor_profile_id,
+          target_profile_id,
+          action,
+          details
+        )
+        SELECT
+          ${session.profile.id},
+          updated_profile.id,
+          ${body.action},
+          ${JSON.stringify({ status: action.status, decision_message: decisionMessage })}::JSONB
+        FROM updated_profile
+        RETURNING id
       )
+      SELECT updated_profile.*
+      FROM updated_profile
+      CROSS JOIN audit_entry
     `;
 
     // Keep Netlify's role metadata useful for future edge gating. The database
