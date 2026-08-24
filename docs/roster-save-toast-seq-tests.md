@@ -91,7 +91,7 @@ Runnable suite: `src/js/__tests__/roster-save-toast.test.ts` (Vitest + happy-dom
 - Type: Edge / Security-adjacent
 - Steps: PATCH responds 401; submit on an existing note.
 - Expected results: console, toast, and note overlay are hidden; the browser navigates to `/login/?next=/roster/`; `#noteError` records "Save failed: Not authenticated" without disclosing the hidden editor.
-- Defect(s): documents the overlay-over-login quirk so a future fix consciously changes this assertion.
+- Defect(s): stale private editor remains visible while the browser navigates back to coordinator sign-in.
 
 ### SAVE-A8 - 403 mid-save closes private UI and shows coordinator denial
 
