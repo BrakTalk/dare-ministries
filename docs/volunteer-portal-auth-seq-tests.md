@@ -31,7 +31,7 @@ Runnable suite: `netlify/functions/__tests__/volunteer-portal-auth-flow.test.ts`
 - PortalAPI → Database: one profile upsert/load per authenticated portal request.
 - PortalAPI → Browser: a no-store public profile containing the access status used by the UI.
 - Confirmed-signup and account-deletion Identity hooks create/suspend the corresponding database profile.
-- This sequence has no photo bytes, file writes, blob storage, subprocesses, streams, or build hooks. The existing photo-management system is being scrapped and is deliberately outside this suite.
+- This sequence has no photo bytes, file writes, blob storage, subprocesses, streams, or build hooks. Photo management remains outside this authentication suite, and its existing behavior is unchanged by this work.
 
 ## Assumptions and ambiguities
 
@@ -424,7 +424,7 @@ Runnable suite: `netlify/functions/__tests__/volunteer-portal-auth-flow.test.ts`
 - Preconditions: portal auth/profile source.
 - Steps: inspect the bundled source contracts used by the test without runtime disk I/O.
 - Expected: no filesystem, subprocess, stream, Netlify Blobs, field-photo, or build-hook dependencies.
-- Defects caught: authentication unexpectedly mutating scrapped photo infrastructure or invoking unsafe host I/O.
+- Defects caught: authentication unexpectedly mutating unrelated photo infrastructure or invoking unsafe host I/O.
 - Notes: future photo upload must be introduced through a separately permission-gated, separately tested sequence.
 
 ## Cross-cutting coverage summary
@@ -456,5 +456,5 @@ Runnable suite: `netlify/functions/__tests__/volunteer-portal-auth-flow.test.ts`
 - [ ] Unauthenticated responses stop before database access and all profile/session responses remain `no-store`.
 - [ ] Portal UI fails closed for 401, 5xx, and malformed payloads.
 - [ ] User-facing errors do not reveal provider internals or whether an account email exists beyond the intended duplicate-registration guidance.
-- [ ] Authentication code has no dependency on the scrapped photo-management system.
+- [ ] Authentication code has no dependency on the photo-management system.
 - [ ] Runnable tests keep one `it(...)` per A1–A7, B1–B12, C1–C9, and D1–D6 case and complete without network/disk side effects.
