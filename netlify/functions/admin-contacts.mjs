@@ -6,7 +6,7 @@ import { requireAuth } from './lib/auth.mjs';
 export const config = { path: '/api/admin/contacts' };
 
 export default async (req) => {
-  const unauthorized = requireAuth(req);
+  const unauthorized = await requireAuth(req);
   if (unauthorized) return unauthorized;
 
   const db = getDatabase();
