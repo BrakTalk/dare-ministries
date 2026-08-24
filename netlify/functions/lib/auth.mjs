@@ -61,7 +61,14 @@ export function isAuthenticated(req) {
 // but it must never bypass the Volunteer Portal's authoritative profile state.
 export async function requireActiveCoordinator() {
   const session = await getPortalSession({ activeOnly: true, role: 'coordinator' });
-  return session.response || null;
+  if (session?.response) return session.response;
+  if (session?.profile?.status !== 'active' || session.profile.role !== 'coordinator') {
+    return new Response(JSON.stringify({ error: 'Private tool access could not be verified.' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+    });
+  }
+  return null;
 }
 
 // Returns an error Response unless both the shared admin session and an active
@@ -70,7 +77,7 @@ export async function requireAuth(req) {
   if (!isAuthenticated(req)) {
     return new Response(JSON.stringify({ error: 'Not authenticated' }), {
       status: 401,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
     });
   }
   return requireActiveCoordinator();
