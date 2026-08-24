@@ -2,6 +2,10 @@
    D.A.R.E. Ministries Volunteer Portal
    ============================================ */
 
+.hidden {
+  display: none !important;
+}
+
 .account-body,
 .portal-body {
   min-height: 100vh;
