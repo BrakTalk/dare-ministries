@@ -13,6 +13,15 @@ const ACTIONS = {
   reactivate: { status: 'active', identityRole: 'member' },
 };
 
+const PORTAL_IDENTITY_ROLES = new Set(['member', 'pending', 'suspended']);
+
+export function mergePortalIdentityRoles(existingRoles, portalRole) {
+  const preservedRoles = Array.isArray(existingRoles)
+    ? existingRoles.filter((role) => typeof role === 'string' && !PORTAL_IDENTITY_ROLES.has(role))
+    : [];
+  return [...new Set([...preservedRoles, portalRole])];
+}
+
 function coordinatorProfile(row) {
   return {
     id: row.id,
@@ -97,7 +106,7 @@ export default async (req) => {
       await identityAdmin.updateUser(target.identity_user_id, {
         app_metadata: {
           ...(identityUser.appMetadata || {}),
-          roles: [action.identityRole],
+          roles: mergePortalIdentityRoles(identityUser.appMetadata?.roles, action.identityRole),
         },
       });
     } catch (err) {

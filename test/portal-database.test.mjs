@@ -6,6 +6,7 @@ import {
   isUuid,
   publicProfile,
 } from '../netlify/functions/lib/portal-auth.mjs';
+import { mergePortalIdentityRoles } from '../netlify/functions/admin-user-profiles.mjs';
 
 test('portal authorization helpers recognize only coordinator roles', () => {
   assert.equal(identityIsCoordinator({ roles: ['member'] }), false);
@@ -15,6 +16,15 @@ test('portal authorization helpers recognize only coordinator roles', () => {
   assert.equal(identityIsCoordinator({ role: 'admin' }), true);
   assert.equal(identityIsCoordinator({ roles: ['administrator'] }), false);
   assert.equal(identityIsCoordinator({}), false);
+});
+
+test('portal role synchronization preserves unrelated Identity roles', () => {
+  assert.deepEqual(mergePortalIdentityRoles(['coordinator', 'member'], 'suspended'), [
+    'coordinator',
+    'suspended',
+  ]);
+  assert.deepEqual(mergePortalIdentityRoles(['member', 'member'], 'member'), ['member']);
+  assert.deepEqual(mergePortalIdentityRoles(undefined, 'pending'), ['pending']);
 });
 
 test('portal profile identifiers require UUIDs', () => {
