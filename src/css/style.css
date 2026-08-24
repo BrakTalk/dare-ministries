@@ -24,6 +24,22 @@
   --color-status-new-bg: #e8f0fb; /* Roster status badge tints */
   --color-status-contacted-bg: #fdf3e3;
   --color-status-active-bg: #e6f2e8;
+  --color-portal-sidebar: #183d2d;
+  --color-portal-info-bg: #eef5f1;
+  --color-portal-info-text: #183d2d;
+  --color-portal-success-bg: #e9f6ed;
+  --color-portal-success-text: #1c6635;
+  --color-portal-error-bg: #fceceb;
+  --color-portal-error-text: #8a2d29;
+  --color-portal-warning-bg: #fff5df;
+  --color-portal-warning-text: #7b5512;
+  --color-portal-status-neutral-bg: #eef0ef;
+  --color-portal-status-pending-bg: #fff1d2;
+  --color-portal-status-pending-text: #78520f;
+  --color-portal-status-active-bg: #e1f3e7;
+  --color-portal-status-active-text: #21633a;
+  --color-portal-status-inactive-bg: #f8e3e2;
+  --color-portal-status-inactive-text: #852d29;
   --color-overlay: rgba(27, 58, 92, 0.55); /* Modal backdrop (primary @ 55%) */
 
   --font-heading: 'Merriweather', Georgia, serif;

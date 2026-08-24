@@ -200,26 +200,26 @@
 
 .account-status.info,
 .portal-notice.info {
-  background: #eef5f1;
-  color: var(--color-primary-dark);
+  background: var(--color-portal-info-bg);
+  color: var(--color-portal-info-text);
 }
 
 .account-status.success,
 .portal-notice.success {
-  background: #e9f6ed;
-  color: #1c6635;
+  background: var(--color-portal-success-bg);
+  color: var(--color-portal-success-text);
 }
 
 .account-status.error,
 .portal-notice.error {
-  background: #fceceb;
-  color: #8a2d29;
+  background: var(--color-portal-error-bg);
+  color: var(--color-portal-error-text);
 }
 
 .account-status.warning,
 .portal-notice.warning {
-  background: #fff5df;
-  color: #7b5512;
+  background: var(--color-portal-warning-bg);
+  color: var(--color-portal-warning-text);
 }
 
 .account-form button[disabled],
@@ -256,7 +256,7 @@
 
 .portal-sidebar {
   padding: 1.5rem 1rem;
-  background: #183d2d;
+  background: var(--color-portal-sidebar);
   color: var(--color-white);
 }
 
@@ -388,7 +388,7 @@
   margin-bottom: 0.9rem;
   border-radius: 999px;
   padding: 0.3rem 0.7rem;
-  background: #eef0ef;
+  background: var(--color-portal-status-neutral-bg);
   color: var(--color-text);
   font-size: 0.78rem;
   font-weight: 800;
@@ -397,19 +397,19 @@
 }
 
 .portal-status-pill.pending {
-  background: #fff1d2;
-  color: #78520f;
+  background: var(--color-portal-status-pending-bg);
+  color: var(--color-portal-status-pending-text);
 }
 
 .portal-status-pill.active {
-  background: #e1f3e7;
-  color: #21633a;
+  background: var(--color-portal-status-active-bg);
+  color: var(--color-portal-status-active-text);
 }
 
 .portal-status-pill.denied,
 .portal-status-pill.suspended {
-  background: #f8e3e2;
-  color: #852d29;
+  background: var(--color-portal-status-inactive-bg);
+  color: var(--color-portal-status-inactive-text);
 }
 
 .portal-form {
