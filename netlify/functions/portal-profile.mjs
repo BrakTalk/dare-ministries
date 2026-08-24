@@ -18,6 +18,12 @@ export default async (req) => {
     const invalidOrigin = requireSameOrigin(req);
     if (invalidOrigin) return invalidOrigin;
 
+    if (!['pending', 'active'].includes(session.profile.status)) {
+      return json({ error: 'This account cannot be edited.' }, 403, {
+        'Cache-Control': 'no-store',
+      });
+    }
+
     const body = await readBody(req);
     if (!body) return json({ error: 'Invalid request body.' }, 400);
 
