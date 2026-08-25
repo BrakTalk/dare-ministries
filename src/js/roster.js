@@ -130,6 +130,7 @@ import { logout } from '/js/vendor/netlify-identity.js';
       { load: loadContacts, emptyEl: 'contactEmpty' },
       { load: loadStats, emptyEl: null },
       { load: loadFieldNotes, emptyEl: 'noteEmpty' },
+      { load: loadPhotoInbox, emptyEl: 'photoInboxEmpty' },
     ];
     const results = await Promise.allSettled(panels.map((p) => p.load()));
     results.forEach((result, i) => {
@@ -631,6 +632,252 @@ import { logout } from '/js/vendor/netlify-identity.js';
         });
       });
   }
+
+  // ─── Emailed photo inbox ────────────────────────────────────────────────────
+
+  let photoInbox = { configured: false, inbox_address: null, submissions: [], notes: [] };
+
+  async function loadPhotoInbox() {
+    photoInbox = await api('/api/admin/field-photo-inbox');
+    renderPhotoInbox();
+  }
+
+  function inboxDateValue(value) {
+    return value ? String(value).slice(0, 10) : '';
+  }
+
+  function inboxDateLabel(value) {
+    if (!value) return 'Capture date unknown';
+    return new Date(String(value).slice(0, 10) + 'T00:00:00Z').toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+      timeZone: 'UTC',
+    });
+  }
+
+  function groupInboxFiles(files) {
+    const groups = new Map();
+    files
+      .filter((file) => file.status === 'ready')
+      .forEach((file) => {
+        const date = inboxDateValue(file.captured_date);
+        const location = file.location_label || file.location_group || 'Location unknown';
+        const key = `${date || 'unknown'}|${location}`;
+        if (!groups.has(key)) groups.set(key, { date, location, files: [] });
+        groups.get(key).files.push(file);
+      });
+    return Array.from(groups.values());
+  }
+
+  function noteOptions() {
+    return (photoInbox.notes || [])
+      .map(
+        (note) =>
+          `<option value="${esc(note.id)}">${esc(note.title)} (${esc(note.status)})</option>`
+      )
+      .join('');
+  }
+
+  function inboxFileMarkup(file, submissionId) {
+    if (file.status !== 'ready') {
+      return `
+        <div class="photo-inbox-file photo-inbox-file--failed">
+          <strong>${esc(file.original_filename || 'Attachment')}</strong>
+          <p>${esc(file.failure_reason || 'This attachment could not be processed.')}</p>
+        </div>`;
+    }
+    return `
+      <article class="photo-inbox-file" data-file-id="${esc(file.id)}">
+        <div class="photo-inbox-file-select">
+          <label><input type="checkbox" data-field="selected" checked> Use photo</label>
+          <label><input type="radio" name="cover-${esc(submissionId)}" data-field="cover"> Cover</label>
+        </div>
+        <button type="button" class="photo-inbox-preview" data-action="preview" aria-label="Preview ${esc(file.original_filename || 'emailed photo')}">
+          <img src="${esc(file.thumbnail_url)}" alt="" loading="lazy">
+        </button>
+        <div class="photo-inbox-file-fields">
+          <label>Caption / alt text
+            <input type="text" data-field="alt" maxlength="300" value="${esc(file.alt)}" placeholder="Describe the photo">
+          </label>
+          <label>Captured date
+            <input type="date" data-field="captured-date" value="${esc(inboxDateValue(file.captured_date))}">
+          </label>
+          <label>Public location label
+            <input type="text" data-field="location" maxlength="160" value="${esc(file.location_label)}" placeholder="${esc(file.location_group || 'e.g., Asheville, NC')}">
+          </label>
+        </div>
+      </article>`;
+  }
+
+  function submissionMarkup(submission) {
+    const groups = groupInboxFiles(submission.files || []);
+    const failed = (submission.files || []).filter((file) => file.status === 'failed');
+    const sender = submission.sender_name
+      ? `${submission.sender_name} <${submission.sender_email}>`
+      : submission.sender_email;
+    const readyCount = groups.reduce((count, group) => count + group.files.length, 0);
+    const groupMarkup = groups
+      .map(
+        (group) => `
+          <section class="photo-inbox-group">
+            <h3>${esc(inboxDateLabel(group.date))} <span>${esc(group.location)}</span></h3>
+            <div class="photo-inbox-grid">
+              ${group.files.map((file) => inboxFileMarkup(file, submission.id)).join('')}
+            </div>
+          </section>`
+      )
+      .join('');
+    const failureMarkup = failed.length
+      ? `<div class="photo-inbox-grid">${failed.map((file) => inboxFileMarkup(file, submission.id)).join('')}</div>`
+      : '';
+    const waitingMarkup =
+      !readyCount && !failed.length
+        ? `<p class="photo-inbox-waiting">${esc(submission.failure_reason || 'This email is still being processed.')}</p>`
+        : '';
+
+    return `
+      <article class="photo-inbox-card" data-submission-id="${esc(submission.id)}">
+        <header class="photo-inbox-card-header">
+          <div>
+            <h2>${esc(submission.subject || 'Photos from the field')}</h2>
+            <p>${esc(sender)} · ${esc(fmtDate(submission.received_at))}</p>
+          </div>
+          <span class="status-badge status-${esc(submission.status)}">${esc(submission.status)}</span>
+        </header>
+        ${groupMarkup}
+        ${failureMarkup}
+        ${waitingMarkup}
+        <div class="photo-inbox-actions">
+          <label>Attach selected photos to
+            <select data-field="note" ${photoInbox.notes.length ? '' : 'disabled'}>
+              <option value="">Choose a Field Note…</option>
+              ${noteOptions()}
+            </select>
+          </label>
+          <div>
+            <button type="button" class="btn btn-outline btn-small" data-action="save" ${readyCount ? '' : 'disabled'}>Save Details</button>
+            <button type="button" class="btn btn-primary btn-small" data-action="approve" ${readyCount && photoInbox.notes.length ? '' : 'disabled'}>Approve Selected</button>
+            <button type="button" class="btn btn-danger btn-small" data-action="reject">Reject Email</button>
+          </div>
+        </div>
+      </article>`;
+  }
+
+  function collectInboxFiles(card, selectedOnly) {
+    return Array.from(card.querySelectorAll('.photo-inbox-file[data-file-id]'))
+      .filter((fileCard) => !selectedOnly || fileCard.querySelector('[data-field="selected"]').checked)
+      .map((fileCard) => ({
+        id: fileCard.dataset.fileId,
+        alt: fileCard.querySelector('[data-field="alt"]').value.trim(),
+        captured_date: fileCard.querySelector('[data-field="captured-date"]').value || null,
+        location_label: fileCard.querySelector('[data-field="location"]').value.trim(),
+        is_cover: fileCard.querySelector('[data-field="cover"]').checked,
+      }));
+  }
+
+  function wirePhotoInboxCard(card) {
+    const submissionId = card.dataset.submissionId;
+    const submission = photoInbox.submissions.find((item) => item.id === submissionId);
+
+    card.querySelectorAll('[data-action="preview"]').forEach((button) => {
+      button.addEventListener('click', function () {
+        const fileCard = this.closest('[data-file-id]');
+        const photos = submission.files
+          .filter((file) => file.status === 'ready')
+          .map((file) => ({ url: file.preview_url, alt: file.alt || file.original_filename || '' }));
+        const index = submission.files
+          .filter((file) => file.status === 'ready')
+          .findIndex((file) => file.id === fileCard.dataset.fileId);
+        if (index >= 0) openPhotoPreview(photos, index, this);
+      });
+    });
+    card.querySelectorAll('[data-field="cover"]').forEach((radio) => {
+      radio.addEventListener('change', function () {
+        if (this.checked) this.closest('[data-file-id]').querySelector('[data-field="selected"]').checked = true;
+      });
+    });
+
+    card.querySelector('[data-action="save"]').addEventListener('click', async function () {
+      this.disabled = true;
+      try {
+        await api('/api/admin/field-photo-inbox', {
+          method: 'PATCH',
+          body: JSON.stringify({ submission_id: submissionId, files: collectInboxFiles(card, false) }),
+        });
+        await loadPhotoInbox();
+        showToast('Photo details saved.');
+      } catch (error) {
+        alert('Could not save photo details: ' + error.message);
+      } finally {
+        this.disabled = false;
+      }
+    });
+
+    card.querySelector('[data-action="approve"]').addEventListener('click', async function () {
+      const noteId = card.querySelector('[data-field="note"]').value;
+      const files = collectInboxFiles(card, true);
+      if (!noteId) return alert('Choose a Field Note first.');
+      if (!files.length) return alert('Select at least one photo.');
+      this.disabled = true;
+      try {
+        await api('/api/admin/field-photo-inbox', {
+          method: 'POST',
+          body: JSON.stringify({ action: 'approve', submission_id: submissionId, note_id: noteId, files }),
+        });
+        await Promise.all([loadPhotoInbox(), loadFieldNotes()]);
+        showToast(`${files.length} photo${files.length === 1 ? '' : 's'} approved.`);
+      } catch (error) {
+        alert('Could not approve photos: ' + error.message);
+      } finally {
+        this.disabled = false;
+      }
+    });
+
+    card.querySelector('[data-action="reject"]').addEventListener('click', async function () {
+      if (!confirm('Reject this email and delete its pending photos?')) return;
+      this.disabled = true;
+      try {
+        await api('/api/admin/field-photo-inbox', {
+          method: 'POST',
+          body: JSON.stringify({ action: 'reject', submission_id: submissionId }),
+        });
+        await loadPhotoInbox();
+        showToast('Photo email rejected.');
+      } catch (error) {
+        alert('Could not reject the email: ' + error.message);
+      } finally {
+        this.disabled = false;
+      }
+    });
+  }
+
+  function renderPhotoInbox() {
+    const pending = photoInbox.submissions || [];
+    const readyCount = pending.reduce(
+      (count, submission) =>
+        count + (submission.files || []).filter((file) => file.status === 'ready').length,
+      0
+    );
+    $('photoInboxCount').textContent = readyCount || '';
+    $('photoInboxEmpty').classList.toggle('hidden', pending.length > 0);
+    $('photoInboxAddress').textContent = photoInbox.configured
+      ? `Send photos to ${photoInbox.inbox_address}`
+      : 'Inbound email is not configured yet. Add FIELD_PHOTO_INBOX_RECIPIENTS in Netlify.';
+    $('photoInboxList').innerHTML = pending.map(submissionMarkup).join('');
+    $('photoInboxList').querySelectorAll('.photo-inbox-card').forEach(wirePhotoInboxCard);
+  }
+
+  $('refreshPhotoInboxBtn').addEventListener('click', async function () {
+    this.disabled = true;
+    try {
+      await loadPhotoInbox();
+    } catch (error) {
+      alert('Could not refresh the Photo Inbox: ' + error.message);
+    } finally {
+      this.disabled = false;
+    }
+  });
 
   // ─── Field note editor modal ────────────────────────────────────────────────
 

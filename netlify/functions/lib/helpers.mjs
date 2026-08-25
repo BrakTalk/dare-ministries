@@ -29,6 +29,11 @@ export function cleanText(value, maxLength) {
 // and delete paths — renaming it would orphan every existing photo.
 export const FIELD_PHOTOS_STORE = 'field-photos';
 
+// Private quarantine for sanitized email submissions. Items in this store are
+// served only through the coordinator-authenticated Photo Inbox endpoint and
+// are copied into FIELD_PHOTOS_STORE only after explicit approval.
+export const FIELD_PHOTO_INBOX_STORE = 'field-photo-inbox';
+
 // Asks Netlify to rebuild the static site (published field notes are baked in
 // at build time). Fire-and-forget: the DB write already succeeded, so a hook
 // failure only delays the site update — never fail the request over it.
