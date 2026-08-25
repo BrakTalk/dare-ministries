@@ -16,7 +16,9 @@ const rosterMarkup = (() => {
   const html = readFileSync(resolve(here, '../../roster.njk'), 'utf8');
   const body = html.match(/<body[^>]*>([\s\S]*)<\/body>/);
   if (!body) throw new Error('roster.njk: could not extract <body>');
-  return body[1].replace(/<script[\s\S]*?<\/script>/g, '');
+  const parsed = new DOMParser().parseFromString(body[1], 'text/html');
+  parsed.querySelectorAll('script').forEach((script) => script.remove());
+  return parsed.body.innerHTML;
 })();
 
 const SUBMISSION_ID = '11111111-1111-4111-8111-111111111111';
