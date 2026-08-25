@@ -6,6 +6,7 @@ import { getStore } from '@netlify/blobs';
 import { FIELD_PHOTO_INBOX_STORE } from './lib/helpers.mjs';
 
 export const config = { schedule: '@daily' };
+const DELETE_BATCH_SIZE = 25;
 
 function retentionDays() {
   const configured = Number(process.env.FIELD_PHOTO_INBOX_RETENTION_DAYS || 30);
@@ -33,7 +34,11 @@ export default async () => {
   const keys = files
     .flatMap((file) => [file.inbox_blob_key, file.thumbnail_blob_key])
     .filter(Boolean);
-  await Promise.allSettled(keys.map((key) => store.delete(key)));
+  for (let index = 0; index < keys.length; index += DELETE_BATCH_SIZE) {
+    await Promise.allSettled(
+      keys.slice(index, index + DELETE_BATCH_SIZE).map((key) => store.delete(key))
+    );
+  }
 
   await db.sql`
     UPDATE field_photo_submission_files
@@ -60,10 +65,10 @@ export default async () => {
       updated_at = NOW()
     WHERE id = ANY(${ids})
   `;
-  for (const submission of submissions) {
-    await db.sql`
-      INSERT INTO field_photo_submission_events (submission_id, action, details)
-      VALUES (${submission.id}, 'expired', ${JSON.stringify({ retention_days: days })}::JSONB)
-    `;
-  }
+  await db.sql`
+    INSERT INTO field_photo_submission_events (submission_id, action, details)
+    SELECT expired.submission_id, 'expired',
+      ${JSON.stringify({ retention_days: days })}::JSONB
+    FROM UNNEST(${ids}::UUID[]) AS expired(submission_id)
+  `;
 };

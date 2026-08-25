@@ -426,4 +426,37 @@ describe('Photo Inbox retention', () => {
     expect(state.dbCalls.some((call) => /gps_longitude = NULL/.test(call.text))).toBe(true);
     expect(state.dbCalls.some((call) => /'expired'/.test(call.text))).toBe(true);
   });
+
+  it('bounds blob deletion concurrency and inserts audit events in one query', async () => {
+    onDb(/SELECT id FROM field_photo_submissions/, [{ id: SUBMISSION_ID }]);
+    onDb(
+      /SELECT inbox_blob_key, thumbnail_blob_key/,
+      Array.from({ length: 30 }, (_, index) => ({
+        inbox_blob_key: `${SUBMISSION_ID}/file-${index}/image.jpg`,
+        thumbnail_blob_key: `${SUBMISSION_ID}/file-${index}/thumbnail.jpg`,
+      }))
+    );
+    let activeDeletes = 0;
+    let maxActiveDeletes = 0;
+    state.inboxStore.delete.mockImplementation(async () => {
+      activeDeletes += 1;
+      maxActiveDeletes = Math.max(maxActiveDeletes, activeDeletes);
+      await Promise.resolve();
+      activeDeletes -= 1;
+    });
+
+    await cleanupInboxHandler();
+
+    expect(state.inboxStore.delete).toHaveBeenCalledTimes(60);
+    expect(maxActiveDeletes).toBeLessThanOrEqual(25);
+    const auditInserts = state.dbCalls.filter((call) =>
+      /INSERT INTO field_photo_submission_events/.test(call.text)
+    );
+    expect(auditInserts).toHaveLength(1);
+    expect(auditInserts[0].text).toContain('FROM UNNEST($::UUID[])');
+    expect(auditInserts[0].values).toEqual([
+      JSON.stringify({ retention_days: 30 }),
+      [SUBMISSION_ID],
+    ]);
+  });
 });
