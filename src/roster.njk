@@ -260,6 +260,15 @@ eleventyExcludeFromCollections: true
     </div>
   </div>
 
+  <!-- Full-size field note photo preview -->
+  <dialog id="photoPreviewDialog" class="photo-preview-dialog" aria-label="Full-size field note photo">
+    <div class="photo-preview-frame">
+      <button type="button" id="photoPreviewClose" class="photo-preview-close" aria-label="Close full-size photo">&times;</button>
+      <img id="photoPreviewImage" class="photo-preview-image" alt="">
+      <p id="photoPreviewCaption" class="photo-preview-caption hidden"></p>
+    </div>
+  </dialog>
+
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
   {% include "identity-importmap.njk" %}

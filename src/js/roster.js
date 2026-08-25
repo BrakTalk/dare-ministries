@@ -803,13 +803,48 @@ import { logout } from '/js/vendor/netlify-identity.js';
 
   // ─── Field note photos ──────────────────────────────────────────────────────
 
+  let photoPreviewTrigger = null;
+
+  function openPhotoPreview(url, alt, trigger) {
+    const dialog = $('photoPreviewDialog');
+    const caption = $('photoPreviewCaption');
+    photoPreviewTrigger = trigger;
+    $('photoPreviewImage').src = url;
+    $('photoPreviewImage').alt = alt || 'Field note photo';
+    caption.textContent = alt || '';
+    caption.classList.toggle('hidden', !alt);
+    dialog.showModal();
+    $('photoPreviewClose').focus();
+  }
+
+  function closePhotoPreview() {
+    const dialog = $('photoPreviewDialog');
+    if (!dialog.open) return;
+    dialog.close();
+    if (photoPreviewTrigger && document.contains(photoPreviewTrigger)) {
+      photoPreviewTrigger.focus();
+    }
+    photoPreviewTrigger = null;
+  }
+
+  $('photoPreviewClose').addEventListener('click', closePhotoPreview);
+  $('photoPreviewDialog').addEventListener('click', function (e) {
+    if (e.target === this) closePhotoPreview();
+  });
+  $('photoPreviewDialog').addEventListener('cancel', function (e) {
+    e.preventDefault();
+    closePhotoPreview();
+  });
+
   function renderPhotoStrip() {
     const photos = currentNote ? currentNote.photos : [];
     $('photoStrip').innerHTML = photos
       .map(
         (p) => `
         <figure class="photo-thumb" data-id="${esc(p.id)}">
-          <img src="${esc(p.url)}" alt="${esc(p.alt)}">
+          <button type="button" class="photo-preview-trigger" data-field="preview" aria-label="${esc(p.alt ? 'View full size: ' + p.alt : 'View full-size field note photo')}">
+            <img src="${esc(p.url)}" alt="${esc(p.alt)}">
+          </button>
           <input type="text" value="${esc(p.alt)}" placeholder="Caption (optional)" data-field="alt" aria-label="Photo caption">
           <div class="photo-thumb-actions">
             <label class="photo-cover-label">
@@ -825,6 +860,10 @@ import { logout } from '/js/vendor/netlify-identity.js';
       .querySelectorAll('.photo-thumb')
       .forEach((thumb) => {
         const id = thumb.dataset.id;
+        thumb.querySelector('[data-field="preview"]').addEventListener('click', function () {
+          const photo = photos.find((p) => String(p.id) === id);
+          if (photo) openPhotoPreview(photo.url, photo.alt, this);
+        });
         thumb.querySelector('[data-field="alt"]').addEventListener('change', async function () {
           try {
             await api('/api/admin/field-note-photos', {

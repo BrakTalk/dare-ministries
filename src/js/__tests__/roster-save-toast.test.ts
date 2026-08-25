@@ -37,7 +37,14 @@ interface NoteRecord {
   start_date: string;
   end_date: string | null;
   body: string;
-  photos: unknown[];
+  photos: PhotoRecord[];
+}
+
+interface PhotoRecord {
+  id: string;
+  url: string;
+  alt: string;
+  is_cover: boolean;
 }
 
 interface LoggedRequest {
@@ -617,6 +624,73 @@ describe('Cross-cutting security', () => {
     expect(document.querySelector('#noteList img')).toBeNull();
     const name = document.querySelector('#noteList .contact-name')!;
     expect(name.textContent).toBe(payload);
+    expect((window as unknown as Record<string, unknown>).__pwned).toBeUndefined();
+  });
+});
+
+describe('Field note photo preview', () => {
+  const photo: PhotoRecord = {
+    id: 'photo-1',
+    url: '/images/field/note-1/photo-1',
+    alt: 'Volunteers repairing a roof',
+    is_cover: true,
+  };
+
+  it('✅ PHOTO-1 opens the selected full-size image in a modal dialog', async () => {
+    const note = makeNote({ id: 'note-1', photos: [photo] });
+    await boot([note]);
+    openFromList(note.id);
+
+    const trigger = document.querySelector<HTMLButtonElement>('.photo-preview-trigger')!;
+    expect(trigger.type).toBe('button');
+    expect(trigger.getAttribute('aria-label')).toContain('View full size');
+    trigger.click();
+
+    const dialog = $('photoPreviewDialog') as HTMLDialogElement;
+    const image = $('photoPreviewImage') as HTMLImageElement;
+    expect(dialog.open).toBe(true);
+    expect(image.getAttribute('src')).toBe(photo.url);
+    expect(image.alt).toBe(photo.alt);
+    expect($('photoPreviewCaption').textContent).toBe(photo.alt);
+    expect(document.activeElement).toBe($('photoPreviewClose'));
+  });
+
+  it('✅ PHOTO-2 close restores focus and leaves the field-note editor open', async () => {
+    const note = makeNote({ id: 'note-1', photos: [photo] });
+    await boot([note]);
+    openFromList(note.id);
+
+    const trigger = document.querySelector<HTMLButtonElement>('.photo-preview-trigger')!;
+    trigger.click();
+    $('photoPreviewClose').click();
+
+    expect(($('photoPreviewDialog') as HTMLDialogElement).open).toBe(false);
+    expect(hidden('noteOverlay')).toBe(false);
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it('✅ PHOTO-3 Escape closes only the photo preview', async () => {
+    const note = makeNote({ id: 'note-1', photos: [photo] });
+    await boot([note]);
+    openFromList(note.id);
+    document.querySelector<HTMLButtonElement>('.photo-preview-trigger')!.click();
+
+    const dialog = $('photoPreviewDialog') as HTMLDialogElement;
+    dialog.dispatchEvent(new Event('cancel', { cancelable: true }));
+
+    expect(dialog.open).toBe(false);
+    expect(hidden('noteOverlay')).toBe(false);
+  });
+
+  it('🔒 PHOTO-4 renders an author-provided caption as text in the preview', async () => {
+    const unsafePhoto = { ...photo, alt: '<img src=x onerror="window.__pwned=1">' };
+    const note = makeNote({ id: 'note-1', photos: [unsafePhoto] });
+    await boot([note]);
+    openFromList(note.id);
+    document.querySelector<HTMLButtonElement>('.photo-preview-trigger')!.click();
+
+    expect($('photoPreviewCaption').textContent).toBe(unsafePhoto.alt);
+    expect($('photoPreviewCaption').querySelector('img')).toBeNull();
     expect((window as unknown as Record<string, unknown>).__pwned).toBeUndefined();
   });
 });
