@@ -7,6 +7,7 @@ interface DbRoute {
 
 const SUBMISSION_ID = '11111111-1111-4111-8111-111111111111';
 const FILE_ID = '22222222-2222-4222-8222-222222222222';
+const SECOND_FILE_ID = '77777777-7777-4777-8777-777777777777';
 const NOTE_ID = '33333333-3333-4333-8333-333333333333';
 const PROFILE_ID = '44444444-4444-4444-8444-444444444444';
 const EMAIL_ID = '55555555-5555-4555-8555-555555555555';
@@ -289,6 +290,34 @@ describe('Coordinator Photo Inbox', () => {
     expect(response.headers.get('cache-control')).toBe('no-store');
     expect(body.submissions[0].files[0].location_group).toBe('Near 33.47, -82.01');
     expect(body.inbox_address).toBe('photos@inbound.example');
+  });
+
+  it('validates the complete metadata batch before updating any photo', async () => {
+    const response = await adminInboxHandler(
+      adminRequest('PATCH', {
+        submission_id: SUBMISSION_ID,
+        files: [
+          {
+            id: FILE_ID,
+            captured_date: '2026-08-24',
+            location_label: 'Augusta, GA',
+            alt: 'Roof repair crew',
+          },
+          {
+            id: SECOND_FILE_ID,
+            captured_date: 'not-a-date',
+            location_label: 'Augusta, GA',
+            alt: 'Completed repair',
+          },
+        ],
+      })
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: 'Each photo needs a valid id and capture date.',
+    });
+    expect(state.dbCalls).toHaveLength(0);
   });
 
   it('promotes only selected sanitized photos into the existing Field Note store', async () => {

@@ -126,19 +126,25 @@ async function saveMetadata(db, session, body) {
   ) {
     return json({ error: 'A valid submission and photo list are required.' }, 400);
   }
+  const files = body.files.map((item) => ({
+    id: item?.id,
+    capturedDate: validatedDate(item?.captured_date),
+    locationLabel: cleanText(item?.location_label, 160),
+    alt: cleanText(item?.alt, 300),
+  }));
+  if (files.some((file) => !isUuid(file.id) || file.capturedDate === undefined)) {
+    return json({ error: 'Each photo needs a valid id and capture date.' }, 400);
+  }
+
   let updated = 0;
-  for (const item of body.files) {
-    const capturedDate = validatedDate(item?.captured_date);
-    if (!isUuid(item?.id) || capturedDate === undefined) {
-      return json({ error: 'Each photo needs a valid id and capture date.' }, 400);
-    }
+  for (const file of files) {
     const rows = await db.sql`
       UPDATE field_photo_submission_files SET
-        captured_date = ${capturedDate},
-        location_label = ${cleanText(item.location_label, 160)},
-        alt = ${cleanText(item.alt, 300)},
+        captured_date = ${file.capturedDate},
+        location_label = ${file.locationLabel},
+        alt = ${file.alt},
         updated_at = NOW()
-      WHERE id = ${item.id}
+      WHERE id = ${file.id}
         AND submission_id = ${body.submission_id}
         AND status = 'ready'
       RETURNING id
