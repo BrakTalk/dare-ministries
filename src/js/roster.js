@@ -803,13 +803,84 @@ import { logout } from '/js/vendor/netlify-identity.js';
 
   // ─── Field note photos ──────────────────────────────────────────────────────
 
+  let photoPreviewTrigger = null;
+  let photoPreviewPhotos = [];
+  let photoPreviewIndex = -1;
+
+  function renderPhotoPreview() {
+    const photo = photoPreviewPhotos[photoPreviewIndex];
+    if (!photo) return;
+    const caption = $('photoPreviewCaption');
+    const multiple = photoPreviewPhotos.length > 1;
+    $('photoPreviewImage').src = photo.url;
+    $('photoPreviewImage').alt = photo.alt || 'Field note photo';
+    caption.textContent = photo.alt || '';
+    caption.classList.toggle('hidden', !photo.alt);
+    $('photoPreviewPrevious').classList.toggle('hidden', !multiple);
+    $('photoPreviewNext').classList.toggle('hidden', !multiple);
+    $('photoPreviewPosition').textContent =
+      `Photo ${photoPreviewIndex + 1} of ${photoPreviewPhotos.length}`;
+    $('photoPreviewPosition').classList.toggle('hidden', !multiple);
+  }
+
+  function openPhotoPreview(photos, index, trigger) {
+    const dialog = $('photoPreviewDialog');
+    photoPreviewTrigger = trigger;
+    photoPreviewPhotos = photos;
+    photoPreviewIndex = index;
+    renderPhotoPreview();
+    dialog.showModal();
+    $('photoPreviewClose').focus();
+  }
+
+  function pagePhotoPreview(offset) {
+    if (photoPreviewPhotos.length < 2) return;
+    photoPreviewIndex =
+      (photoPreviewIndex + offset + photoPreviewPhotos.length) % photoPreviewPhotos.length;
+    renderPhotoPreview();
+  }
+
+  function closePhotoPreview() {
+    const dialog = $('photoPreviewDialog');
+    if (!dialog.open) return;
+    dialog.close();
+    if (photoPreviewTrigger && document.contains(photoPreviewTrigger)) {
+      photoPreviewTrigger.focus();
+    }
+    photoPreviewTrigger = null;
+    photoPreviewPhotos = [];
+    photoPreviewIndex = -1;
+  }
+
+  $('photoPreviewClose').addEventListener('click', closePhotoPreview);
+  $('photoPreviewPrevious').addEventListener('click', () => pagePhotoPreview(-1));
+  $('photoPreviewNext').addEventListener('click', () => pagePhotoPreview(1));
+  $('photoPreviewDialog').addEventListener('click', function (e) {
+    if (e.target === this) closePhotoPreview();
+  });
+  $('photoPreviewDialog').addEventListener('cancel', function (e) {
+    e.preventDefault();
+    closePhotoPreview();
+  });
+  $('photoPreviewDialog').addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      pagePhotoPreview(-1);
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      pagePhotoPreview(1);
+    }
+  });
+
   function renderPhotoStrip() {
     const photos = currentNote ? currentNote.photos : [];
     $('photoStrip').innerHTML = photos
       .map(
         (p) => `
         <figure class="photo-thumb" data-id="${esc(p.id)}">
-          <img src="${esc(p.url)}" alt="${esc(p.alt)}">
+          <button type="button" class="photo-preview-trigger" data-field="preview" aria-label="${esc(p.alt ? 'View full size: ' + p.alt : 'View full-size field note photo')}">
+            <img src="${esc(p.url)}" alt="${esc(p.alt)}">
+          </button>
           <input type="text" value="${esc(p.alt)}" placeholder="Caption (optional)" data-field="alt" aria-label="Photo caption">
           <div class="photo-thumb-actions">
             <label class="photo-cover-label">
@@ -825,6 +896,10 @@ import { logout } from '/js/vendor/netlify-identity.js';
       .querySelectorAll('.photo-thumb')
       .forEach((thumb) => {
         const id = thumb.dataset.id;
+        thumb.querySelector('[data-field="preview"]').addEventListener('click', function () {
+          const index = photos.findIndex((p) => String(p.id) === id);
+          if (index >= 0) openPhotoPreview(photos, index, this);
+        });
         thumb.querySelector('[data-field="alt"]').addEventListener('change', async function () {
           try {
             await api('/api/admin/field-note-photos', {

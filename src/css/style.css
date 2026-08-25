@@ -41,6 +41,12 @@
   --color-portal-status-inactive-bg: #f8e3e2;
   --color-portal-status-inactive-text: #852d29;
   --color-overlay: rgba(27, 58, 92, 0.55); /* Modal backdrop (primary @ 55%) */
+  --color-gallery-trigger-overlay: rgba(0, 0, 0, 0.8);
+  --color-gallery-preview-trigger-overlay: rgba(0, 0, 0, 0.78);
+  --color-gallery-backdrop: rgba(7, 18, 31, 0.9);
+  --color-gallery-control: rgba(7, 18, 31, 0.78);
+  --color-gallery-surface: rgba(7, 18, 31, 0.82);
+  --color-gallery-control-border: rgba(255, 255, 255, 0.75);
 
   --font-heading: 'Merriweather', Georgia, serif;
   --font-body: 'Open Sans', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -51,6 +57,23 @@
 
   --radius: 8px;
   --radius-lg: 12px;
+
+  --space-nav-mobile-link-block: 12px;
+  --space-nav-mobile-link-inline: 16px;
+  --space-gallery-trigger: 12px;
+  --space-gallery-preview-trigger: 0.45rem;
+  --space-gallery-frame-gap: 0.65rem;
+  --space-gallery-viewport-gutter: 2rem;
+  --space-gallery-stage-reserve: 6rem;
+  --space-gallery-control-inset: 0.65rem;
+  --space-gallery-close-inset: 0.6rem;
+  --space-gallery-caption-block: 0.45rem;
+  --space-gallery-caption-inline: 0.75rem;
+  --space-gallery-position-block: 0.3rem;
+  --space-gallery-mobile-control-inset: 0.4rem;
+  --size-gallery-page-control: 3rem;
+  --size-gallery-close-control: 2.5rem;
+  --size-gallery-mobile-page-control: 2.75rem;
 }
 
 /* --- Reset & Base --- */
@@ -1172,9 +1195,17 @@ h4 {
     display: flex;
   }
 
-  .nav-links a {
-    padding: 12px 16px;
+  .nav-links li {
+    display: flex;
+    justify-content: center;
     width: 100%;
+  }
+
+  .nav-links a {
+    display: block;
+    box-sizing: border-box;
+    padding: var(--space-nav-mobile-link-block) var(--space-nav-mobile-link-inline);
+    width: auto;
   }
 
   .hero h1 {
@@ -1579,7 +1610,42 @@ h4 {
   background: var(--color-white);
 }
 
+.field-gallery-trigger {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-white);
+  cursor: zoom-in;
+}
+
+.field-gallery-trigger::after {
+  content: 'View full size';
+  position: absolute;
+  inset: auto 0 0;
+  padding: var(--space-gallery-trigger);
+  background: linear-gradient(transparent, var(--color-gallery-trigger-overlay));
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-align: center;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.field-gallery-trigger:hover::after,
+.field-gallery-trigger:focus-visible::after {
+  opacity: 1;
+}
+
+.field-gallery-trigger:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: -3px;
+}
+
 .field-gallery-item img {
+  display: block;
   width: 100%;
   aspect-ratio: 4 / 3;
   object-fit: cover;
@@ -1589,6 +1655,126 @@ h4 {
   padding: 8px 12px;
   font-size: 0.85rem;
   color: var(--color-text-light);
+}
+
+body.field-photo-open {
+  overflow: hidden;
+}
+
+.field-photo-dialog {
+  max-width: none;
+  max-height: none;
+  margin: auto;
+  padding: 0;
+  border: 0;
+  overflow: visible;
+  background: transparent;
+  color: var(--color-white);
+}
+
+.field-photo-dialog::backdrop {
+  background: var(--color-gallery-backdrop);
+  backdrop-filter: blur(2px);
+}
+
+.field-photo-frame {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-gallery-frame-gap);
+  max-width: calc(100vw - var(--space-gallery-viewport-gutter));
+  max-height: calc(100vh - var(--space-gallery-viewport-gutter));
+  max-height: calc(100dvh - var(--space-gallery-viewport-gutter));
+}
+
+.field-photo-stage {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: calc(100vw - var(--space-gallery-viewport-gutter));
+  max-height: calc(100vh - var(--space-gallery-stage-reserve));
+  max-height: calc(100dvh - var(--space-gallery-stage-reserve));
+}
+
+.field-photo-image {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: calc(100vw - var(--space-gallery-viewport-gutter));
+  max-height: calc(100vh - var(--space-gallery-stage-reserve));
+  max-height: calc(100dvh - var(--space-gallery-stage-reserve));
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  object-fit: contain;
+}
+
+.field-photo-page,
+.field-photo-close {
+  position: absolute;
+  z-index: 1;
+  display: grid;
+  padding: 0;
+  border: 2px solid var(--color-gallery-control-border);
+  border-radius: 50%;
+  background: var(--color-gallery-control);
+  color: var(--color-white);
+  line-height: 1;
+  place-items: center;
+  cursor: pointer;
+}
+
+.field-photo-page {
+  top: 50%;
+  width: var(--size-gallery-page-control);
+  height: var(--size-gallery-page-control);
+  transform: translateY(-50%);
+  font-size: 2.5rem;
+}
+
+.field-photo-page--previous {
+  left: var(--space-gallery-control-inset);
+}
+
+.field-photo-page--next {
+  right: var(--space-gallery-control-inset);
+}
+
+.field-photo-close {
+  top: var(--space-gallery-close-inset);
+  right: var(--space-gallery-close-inset);
+  width: var(--size-gallery-close-control);
+  height: var(--size-gallery-close-control);
+  font-size: 1.75rem;
+}
+
+.field-photo-page:hover,
+.field-photo-page:focus-visible,
+.field-photo-close:hover,
+.field-photo-close:focus-visible {
+  background: var(--color-primary);
+  border-color: var(--color-white);
+}
+
+.field-photo-caption,
+.field-photo-position {
+  margin: 0;
+  border-radius: var(--radius);
+  background: var(--color-gallery-surface);
+  color: var(--color-white);
+  text-align: center;
+}
+
+.field-photo-caption {
+  max-width: min(90vw, 760px);
+  padding: var(--space-gallery-caption-block) var(--space-gallery-caption-inline);
+  font-size: 0.9rem;
+}
+
+.field-photo-position {
+  padding: var(--space-gallery-position-block) var(--space-gallery-control-inset);
+  font-size: 0.78rem;
+  font-weight: 700;
 }
 
 .field-note-footer {
@@ -1622,5 +1808,21 @@ h4 {
 
   .page-hero h1 {
     font-size: 1.8rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .field-photo-page {
+    width: var(--size-gallery-mobile-page-control);
+    height: var(--size-gallery-mobile-page-control);
+    font-size: 2.2rem;
+  }
+
+  .field-photo-page--previous {
+    left: var(--space-gallery-mobile-control-inset);
+  }
+
+  .field-photo-page--next {
+    right: var(--space-gallery-mobile-control-inset);
   }
 }

@@ -519,11 +519,188 @@
   background: var(--color-cream);
 }
 
-.photo-thumb img {
+.photo-preview-trigger {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-white);
+  cursor: zoom-in;
+}
+
+.photo-preview-trigger::after {
+  content: 'View full size';
+  position: absolute;
+  inset: auto 0 0;
+  padding: var(--space-gallery-preview-trigger);
+  background: linear-gradient(transparent, var(--color-gallery-preview-trigger-overlay));
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-align: center;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.photo-preview-trigger:hover::after,
+.photo-preview-trigger:focus-visible::after {
+  opacity: 1;
+}
+
+.photo-preview-trigger:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: -3px;
+}
+
+.photo-preview-trigger img {
   width: 100%;
   aspect-ratio: 4 / 3;
   object-fit: cover;
   display: block;
+}
+
+.photo-preview-dialog {
+  max-width: none;
+  max-height: none;
+  margin: auto;
+  padding: 0;
+  border: 0;
+  overflow: visible;
+  background: transparent;
+  color: var(--color-white);
+}
+
+.photo-preview-dialog::backdrop {
+  background: var(--color-gallery-backdrop);
+  backdrop-filter: blur(2px);
+}
+
+.photo-preview-frame {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-gallery-frame-gap);
+  max-width: calc(100vw - var(--space-gallery-viewport-gutter));
+  max-height: calc(100vh - var(--space-gallery-viewport-gutter));
+  max-height: calc(100dvh - var(--space-gallery-viewport-gutter));
+}
+
+.photo-preview-stage {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: calc(100vw - var(--space-gallery-viewport-gutter));
+  max-height: calc(100vh - var(--space-gallery-stage-reserve));
+  max-height: calc(100dvh - var(--space-gallery-stage-reserve));
+}
+
+.photo-preview-image {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: calc(100vw - var(--space-gallery-viewport-gutter));
+  max-height: calc(100vh - var(--space-gallery-stage-reserve));
+  max-height: calc(100dvh - var(--space-gallery-stage-reserve));
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  object-fit: contain;
+}
+
+.photo-preview-page {
+  position: absolute;
+  top: 50%;
+  z-index: 1;
+  display: grid;
+  width: var(--size-gallery-page-control);
+  height: var(--size-gallery-page-control);
+  padding: 0;
+  transform: translateY(-50%);
+  border: 2px solid var(--color-gallery-control-border);
+  border-radius: 50%;
+  background: var(--color-gallery-control);
+  color: var(--color-white);
+  font-size: 2.5rem;
+  line-height: 1;
+  place-items: center;
+  cursor: pointer;
+}
+
+.photo-preview-page--previous {
+  left: var(--space-gallery-control-inset);
+}
+
+.photo-preview-page--next {
+  right: var(--space-gallery-control-inset);
+}
+
+.photo-preview-page:hover,
+.photo-preview-page:focus-visible {
+  background: var(--color-primary);
+  border-color: var(--color-white);
+}
+
+.photo-preview-close {
+  position: absolute;
+  top: var(--space-gallery-close-inset);
+  right: var(--space-gallery-close-inset);
+  z-index: 1;
+  display: grid;
+  width: var(--size-gallery-close-control);
+  height: var(--size-gallery-close-control);
+  padding: 0;
+  border: 2px solid var(--color-gallery-control-border);
+  border-radius: 50%;
+  background: var(--color-gallery-control);
+  color: var(--color-white);
+  font-size: 1.75rem;
+  line-height: 1;
+  place-items: center;
+  cursor: pointer;
+}
+
+.photo-preview-close:hover,
+.photo-preview-close:focus-visible {
+  background: var(--color-primary);
+  border-color: var(--color-white);
+}
+
+.photo-preview-caption {
+  max-width: min(90vw, 760px);
+  margin: 0;
+  padding: var(--space-gallery-caption-block) var(--space-gallery-caption-inline);
+  border-radius: var(--radius);
+  background: var(--color-gallery-surface);
+  color: var(--color-white);
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.photo-preview-position {
+  margin: 0;
+  padding: var(--space-gallery-position-block) var(--space-gallery-control-inset);
+  border-radius: var(--radius);
+  background: var(--color-gallery-surface);
+  color: var(--color-white);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+@media (max-width: 480px) {
+  .photo-preview-page {
+    width: var(--size-gallery-mobile-page-control);
+    height: var(--size-gallery-mobile-page-control);
+    font-size: 2.2rem;
+  }
+
+  .photo-preview-page--previous {
+    left: var(--space-gallery-mobile-control-inset);
+  }
+
+  .photo-preview-page--next {
+    right: var(--space-gallery-mobile-control-inset);
+  }
 }
 
 .photo-thumb input[type='text'] {
