@@ -195,32 +195,6 @@ layout: false
     </div>
   </section>
 
-  <!-- Gallery Section -->
-  <section class="section gallery" id="gallery">
-    <div class="container">
-      <div class="section-header">
-        <h2>Our Work</h2>
-        <div class="section-divider"></div>
-        <p class="section-subtitle">Stories of recovery and hope from the field</p>
-      </div>
-      <div class="gallery-grid">
-        {% for item in gallery.items %}
-        <div class="gallery-item">
-          {% if item.image %}
-          <img src="{{ item.image }}" alt="{{ item.alt }}" loading="lazy">
-          <span class="gallery-caption">{{ item.caption }}</span>
-          {% else %}
-          <div class="gallery-placeholder">
-            <span>{{ item.caption }}</span>
-          </div>
-          {% endif %}
-        </div>
-        {% endfor %}
-      </div>
-      <p class="gallery-note"><em>Have photos from a DARE deployment? Send them to <a href="mailto:{{ site.contact.email }}">{{ site.contact.email }}</a></em></p>
-    </div>
-  </section>
-
   <!-- From the Field Section -->
   {% if fieldNotes.length %}
   <section class="section updates" id="updates">
