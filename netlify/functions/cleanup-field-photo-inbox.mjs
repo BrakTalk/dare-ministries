@@ -19,7 +19,7 @@ export default async () => {
     SELECT id
     FROM field_photo_submissions
     WHERE status IN ('processing', 'ready', 'partial', 'failed', 'no_photos')
-      AND received_at < NOW() - (${days} * INTERVAL '1 day')
+      AND received_at < NOW() - make_interval(days => ${days}::INTEGER)
   `;
   if (!submissions.length) return;
 

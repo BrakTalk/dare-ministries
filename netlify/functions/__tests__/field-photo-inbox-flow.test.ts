@@ -387,6 +387,11 @@ describe('Photo Inbox retention', () => {
 
     await cleanupInboxHandler();
 
+    const expiryQuery = state.dbCalls.find((call) =>
+      /SELECT id FROM field_photo_submissions/.test(call.text)
+    );
+    expect(expiryQuery?.text).toContain('make_interval(days => $::INTEGER)');
+    expect(expiryQuery?.values).toEqual([30]);
     expect(state.inboxStore.delete).toHaveBeenCalledTimes(2);
     expect(state.dbCalls.some((call) => /gps_latitude = NULL/.test(call.text))).toBe(true);
     expect(state.dbCalls.some((call) => /gps_longitude = NULL/.test(call.text))).toBe(true);
