@@ -563,6 +563,7 @@
 .photo-preview-dialog {
   max-width: none;
   max-height: none;
+  margin: auto;
   padding: 0;
   border: 0;
   overflow: visible;
