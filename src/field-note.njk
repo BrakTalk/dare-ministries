@@ -43,13 +43,28 @@ permalink: "/field-notes/{{ note.slug }}/index.html"
       <div class="field-gallery">
         {% for photo in note.photos %}
         <figure class="field-gallery-item">
-          <img src="{{ photo.url }}" alt="{{ photo.alt }}" loading="lazy">
+          <button type="button" class="field-gallery-trigger" data-photo-index="{{ loop.index0 }}" aria-label="{% if photo.alt %}View full size: {{ photo.alt | escape }}{% else %}View full-size field note photo {{ loop.index }}{% endif %}">
+            <img src="{{ photo.url }}" alt="{{ photo.alt | escape }}" loading="lazy">
+          </button>
           {% if photo.alt %}
-          <figcaption>{{ photo.alt }}</figcaption>
+          <figcaption>{{ photo.alt | escape }}</figcaption>
           {% endif %}
         </figure>
         {% endfor %}
       </div>
+
+      <dialog id="fieldPhotoDialog" class="field-photo-dialog" aria-label="Full-size field note photo">
+        <div class="field-photo-frame">
+          <div class="field-photo-stage">
+            <button type="button" id="fieldPhotoClose" class="field-photo-close" aria-label="Close full-size photo">&times;</button>
+            <button type="button" id="fieldPhotoPrevious" class="field-photo-page field-photo-page--previous" aria-label="Previous photo">&#8249;</button>
+            <img id="fieldPhotoImage" class="field-photo-image" alt="">
+            <button type="button" id="fieldPhotoNext" class="field-photo-page field-photo-page--next" aria-label="Next photo">&#8250;</button>
+          </div>
+          <p id="fieldPhotoCaption" class="field-photo-caption" hidden></p>
+          <p id="fieldPhotoPosition" class="field-photo-position" aria-live="polite" hidden></p>
+        </div>
+      </dialog>
       {% endif %}
 
       <div class="field-note-footer">
@@ -61,5 +76,6 @@ permalink: "/field-notes/{{ note.slug }}/index.html"
   {% include "footer.njk" %}
 
   <script src="/js/main.js"></script>
+  <script src="/js/field-note-gallery.js"></script>
 </body>
 </html>

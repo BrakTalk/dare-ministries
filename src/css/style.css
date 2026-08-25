@@ -1579,7 +1579,42 @@ h4 {
   background: var(--color-white);
 }
 
+.field-gallery-trigger {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-white);
+  cursor: zoom-in;
+}
+
+.field-gallery-trigger::after {
+  content: 'View full size';
+  position: absolute;
+  inset: auto 0 0;
+  padding: 12px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-align: center;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.field-gallery-trigger:hover::after,
+.field-gallery-trigger:focus-visible::after {
+  opacity: 1;
+}
+
+.field-gallery-trigger:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: -3px;
+}
+
 .field-gallery-item img {
+  display: block;
   width: 100%;
   aspect-ratio: 4 / 3;
   object-fit: cover;
@@ -1589,6 +1624,125 @@ h4 {
   padding: 8px 12px;
   font-size: 0.85rem;
   color: var(--color-text-light);
+}
+
+body.field-photo-open {
+  overflow: hidden;
+}
+
+.field-photo-dialog {
+  max-width: none;
+  max-height: none;
+  padding: 0;
+  border: 0;
+  overflow: visible;
+  background: transparent;
+  color: var(--color-white);
+}
+
+.field-photo-dialog::backdrop {
+  background: rgba(7, 18, 31, 0.9);
+  backdrop-filter: blur(2px);
+}
+
+.field-photo-frame {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.65rem;
+  max-width: calc(100vw - 2rem);
+  max-height: calc(100vh - 2rem);
+  max-height: calc(100dvh - 2rem);
+}
+
+.field-photo-stage {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: calc(100vw - 2rem);
+  max-height: calc(100vh - 6rem);
+  max-height: calc(100dvh - 6rem);
+}
+
+.field-photo-image {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: calc(100vw - 2rem);
+  max-height: calc(100vh - 6rem);
+  max-height: calc(100dvh - 6rem);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  object-fit: contain;
+}
+
+.field-photo-page,
+.field-photo-close {
+  position: absolute;
+  z-index: 1;
+  display: grid;
+  padding: 0;
+  border: 2px solid rgba(255, 255, 255, 0.75);
+  border-radius: 50%;
+  background: rgba(7, 18, 31, 0.78);
+  color: var(--color-white);
+  line-height: 1;
+  place-items: center;
+  cursor: pointer;
+}
+
+.field-photo-page {
+  top: 50%;
+  width: 3rem;
+  height: 3rem;
+  transform: translateY(-50%);
+  font-size: 2.5rem;
+}
+
+.field-photo-page--previous {
+  left: 0.65rem;
+}
+
+.field-photo-page--next {
+  right: 0.65rem;
+}
+
+.field-photo-close {
+  top: 0.6rem;
+  right: 0.6rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  font-size: 1.75rem;
+}
+
+.field-photo-page:hover,
+.field-photo-page:focus-visible,
+.field-photo-close:hover,
+.field-photo-close:focus-visible {
+  background: var(--color-primary);
+  border-color: var(--color-white);
+}
+
+.field-photo-caption,
+.field-photo-position {
+  margin: 0;
+  border-radius: var(--radius);
+  background: rgba(7, 18, 31, 0.82);
+  color: var(--color-white);
+  text-align: center;
+}
+
+.field-photo-caption {
+  max-width: min(90vw, 760px);
+  padding: 0.45rem 0.75rem;
+  font-size: 0.9rem;
+}
+
+.field-photo-position {
+  padding: 0.3rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 700;
 }
 
 .field-note-footer {
@@ -1622,5 +1776,21 @@ h4 {
 
   .page-hero h1 {
     font-size: 1.8rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .field-photo-page {
+    width: 2.75rem;
+    height: 2.75rem;
+    font-size: 2.2rem;
+  }
+
+  .field-photo-page--previous {
+    left: 0.4rem;
+  }
+
+  .field-photo-page--next {
+    right: 0.4rem;
   }
 }
