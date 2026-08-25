@@ -534,8 +534,8 @@
   content: 'View full size';
   position: absolute;
   inset: auto 0 0;
-  padding: 0.45rem;
-  background: linear-gradient(transparent, rgba(0, 0, 0, 0.78));
+  padding: var(--space-gallery-preview-trigger);
+  background: linear-gradient(transparent, var(--color-gallery-preview-trigger-overlay));
   font-size: 0.75rem;
   font-weight: 700;
   text-align: center;
@@ -572,7 +572,7 @@
 }
 
 .photo-preview-dialog::backdrop {
-  background: rgba(7, 18, 31, 0.9);
+  background: var(--color-gallery-backdrop);
   backdrop-filter: blur(2px);
 }
 
@@ -580,10 +580,10 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.65rem;
-  max-width: calc(100vw - 2rem);
-  max-height: calc(100vh - 2rem);
-  max-height: calc(100dvh - 2rem);
+  gap: var(--space-gallery-frame-gap);
+  max-width: calc(100vw - var(--space-gallery-viewport-gutter));
+  max-height: calc(100vh - var(--space-gallery-viewport-gutter));
+  max-height: calc(100dvh - var(--space-gallery-viewport-gutter));
 }
 
 .photo-preview-stage {
@@ -591,18 +591,18 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  max-width: calc(100vw - 2rem);
-  max-height: calc(100vh - 6rem);
-  max-height: calc(100dvh - 6rem);
+  max-width: calc(100vw - var(--space-gallery-viewport-gutter));
+  max-height: calc(100vh - var(--space-gallery-stage-reserve));
+  max-height: calc(100dvh - var(--space-gallery-stage-reserve));
 }
 
 .photo-preview-image {
   display: block;
   width: auto;
   height: auto;
-  max-width: calc(100vw - 2rem);
-  max-height: calc(100vh - 6rem);
-  max-height: calc(100dvh - 6rem);
+  max-width: calc(100vw - var(--space-gallery-viewport-gutter));
+  max-height: calc(100vh - var(--space-gallery-stage-reserve));
+  max-height: calc(100dvh - var(--space-gallery-stage-reserve));
   border-radius: var(--radius);
   box-shadow: var(--shadow-lg);
   object-fit: contain;
@@ -613,13 +613,13 @@
   top: 50%;
   z-index: 1;
   display: grid;
-  width: 3rem;
-  height: 3rem;
+  width: var(--size-gallery-page-control);
+  height: var(--size-gallery-page-control);
   padding: 0;
   transform: translateY(-50%);
-  border: 2px solid rgba(255, 255, 255, 0.75);
+  border: 2px solid var(--color-gallery-control-border);
   border-radius: 50%;
-  background: rgba(7, 18, 31, 0.78);
+  background: var(--color-gallery-control);
   color: var(--color-white);
   font-size: 2.5rem;
   line-height: 1;
@@ -628,11 +628,11 @@
 }
 
 .photo-preview-page--previous {
-  left: 0.65rem;
+  left: var(--space-gallery-control-inset);
 }
 
 .photo-preview-page--next {
-  right: 0.65rem;
+  right: var(--space-gallery-control-inset);
 }
 
 .photo-preview-page:hover,
@@ -643,16 +643,16 @@
 
 .photo-preview-close {
   position: absolute;
-  top: 0.6rem;
-  right: 0.6rem;
+  top: var(--space-gallery-close-inset);
+  right: var(--space-gallery-close-inset);
   z-index: 1;
   display: grid;
-  width: 2.5rem;
-  height: 2.5rem;
+  width: var(--size-gallery-close-control);
+  height: var(--size-gallery-close-control);
   padding: 0;
-  border: 2px solid rgba(255, 255, 255, 0.75);
+  border: 2px solid var(--color-gallery-control-border);
   border-radius: 50%;
-  background: rgba(7, 18, 31, 0.78);
+  background: var(--color-gallery-control);
   color: var(--color-white);
   font-size: 1.75rem;
   line-height: 1;
@@ -669,9 +669,9 @@
 .photo-preview-caption {
   max-width: min(90vw, 760px);
   margin: 0;
-  padding: 0.45rem 0.75rem;
+  padding: var(--space-gallery-caption-block) var(--space-gallery-caption-inline);
   border-radius: var(--radius);
-  background: rgba(7, 18, 31, 0.82);
+  background: var(--color-gallery-surface);
   color: var(--color-white);
   font-size: 0.9rem;
   text-align: center;
@@ -679,9 +679,9 @@
 
 .photo-preview-position {
   margin: 0;
-  padding: 0.3rem 0.65rem;
+  padding: var(--space-gallery-position-block) var(--space-gallery-control-inset);
   border-radius: var(--radius);
-  background: rgba(7, 18, 31, 0.82);
+  background: var(--color-gallery-surface);
   color: var(--color-white);
   font-size: 0.78rem;
   font-weight: 700;
@@ -689,17 +689,17 @@
 
 @media (max-width: 480px) {
   .photo-preview-page {
-    width: 2.75rem;
-    height: 2.75rem;
+    width: var(--size-gallery-mobile-page-control);
+    height: var(--size-gallery-mobile-page-control);
     font-size: 2.2rem;
   }
 
   .photo-preview-page--previous {
-    left: 0.4rem;
+    left: var(--space-gallery-mobile-control-inset);
   }
 
   .photo-preview-page--next {
-    right: 0.4rem;
+    right: var(--space-gallery-mobile-control-inset);
   }
 }
 
