@@ -17,8 +17,6 @@ const ALLOWED_DECLARED_TYPES = new Set([
   'image/jpeg',
   'image/png',
   'image/webp',
-  'image/heic',
-  'image/heif',
   'image/avif',
 ]);
 

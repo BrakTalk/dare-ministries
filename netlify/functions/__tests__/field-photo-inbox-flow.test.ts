@@ -250,6 +250,35 @@ describe('Resend field photo ingestion', () => {
     expect(metadataUpdate?.values).toContain(33.4735);
     expect(metadataUpdate?.values).toContain(-82.0105);
   });
+
+  it('records HEIC attachments as unsupported without downloading them', async () => {
+    onDb(/INSERT INTO field_photo_submissions/, [{ id: SUBMISSION_ID, status: 'processing' }]);
+    state.receivingGet.mockResolvedValue({
+      data: {
+        attachments: [
+          {
+            id: ATTACHMENT_ID,
+            filename: 'crew.heic',
+            size: 2048,
+            content_type: 'image/heic',
+          },
+        ],
+      },
+      error: null,
+    });
+
+    const response = await inboundHandler(webhookRequest());
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, photos: 0 });
+    expect(state.attachmentGet).not.toHaveBeenCalled();
+    expect(state.processFieldPhoto).not.toHaveBeenCalled();
+    const failedFileInsert = state.dbCalls.find((call) =>
+      /INSERT INTO field_photo_submission_files/.test(call.text)
+    );
+    expect(failedFileInsert?.values).toContain('image/heic');
+    expect(failedFileInsert?.values).toContain('The attachment is not a supported photo type.');
+  });
 });
 
 describe('Coordinator Photo Inbox', () => {

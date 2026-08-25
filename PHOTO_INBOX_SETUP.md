@@ -45,7 +45,7 @@ Netlify applies the database migration on deploy. After deployment:
 - Intake is a Netlify background function so Resend receives a prompt acknowledgement while image work continues.
 - Provider event and email IDs are unique, making webhook replays idempotent.
 - The intake accepts at most 12 supported image attachments, 15 MB per attachment, and 40 MB total per message.
-- JPEG, PNG, WebP, HEIC/HEIF, and AVIF inputs are decoded with pixel and animation limits. Declared MIME type is not trusted on its own.
+- JPEG, PNG, WebP, and AVIF inputs are decoded with pixel and animation limits. Declared MIME type is not trusted on its own.
 - Every accepted image is auto-oriented, resized to at most 2000 pixels, and re-encoded as JPEG. The public derivative contains no source EXIF or embedded payload.
 - Pending images use a private Netlify Blobs store and are served only through the coordinator-authorized admin endpoint with `no-store` caching.
 - EXIF capture date, timezone offset, camera details, and GPS are allowlisted and normalized. Coordinates are available only inside the private queue and are never copied into the public photo record.

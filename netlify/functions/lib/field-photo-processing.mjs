@@ -6,7 +6,7 @@ export const INBOX_IMAGE_CONTENT_TYPE = 'image/jpeg';
 export const MAX_INBOX_IMAGE_BYTES = 15 * 1024 * 1024;
 export const MAX_INBOX_IMAGE_PIXELS = 40_000_000;
 
-const SUPPORTED_INPUT_FORMATS = new Set(['jpeg', 'png', 'webp', 'heif', 'avif']);
+const SUPPORTED_INPUT_FORMATS = new Set(['jpeg', 'png', 'webp', 'avif']);
 
 function validCalendarParts(year, month, day, hour, minute, second) {
   const value = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
@@ -121,7 +121,7 @@ export async function processFieldPhoto(input) {
   });
   const metadata = await image.metadata();
   if (!SUPPORTED_INPUT_FORMATS.has(metadata.format)) {
-    throw new Error('Only JPEG, PNG, WebP, HEIC, and AVIF photos are supported.');
+    throw new Error('Only JPEG, PNG, WebP, and AVIF photos are supported.');
   }
   if (!metadata.width || !metadata.height)
     throw new Error('The image dimensions could not be read.');
