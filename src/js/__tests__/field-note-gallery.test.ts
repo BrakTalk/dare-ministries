@@ -120,11 +120,13 @@ describe('public Field Note photo gallery', () => {
     expect(($('fieldPhotoDialog') as HTMLDialogElement).open).toBe(false);
   });
 
-  it('✅ PUBLIC-PHOTO-7 Escape dismisses through the native cancel event', () => {
+  it('✅ PUBLIC-PHOTO-7 an Escape keydown explicitly dismisses the dialog', () => {
     boot();
     document.querySelector<HTMLButtonElement>('.field-gallery-trigger')!.click();
     const dialog = $('fieldPhotoDialog') as HTMLDialogElement;
-    dialog.dispatchEvent(new Event('cancel', { cancelable: true }));
+    dialog.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    );
     expect(dialog.open).toBe(false);
   });
 

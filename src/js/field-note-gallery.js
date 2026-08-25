@@ -77,7 +77,10 @@
     closePhoto();
   });
   dialog.addEventListener('keydown', function (event) {
-    if (event.key === 'ArrowLeft') {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closePhoto();
+    } else if (event.key === 'ArrowLeft') {
       event.preventDefault();
       pagePhoto(-1);
     } else if (event.key === 'ArrowRight') {
