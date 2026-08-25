@@ -9,3 +9,6 @@ _site/
 .env.local
 # Netlify CLI local artifacts
 deno.lock
+.gitnexus
+# Local working documents (specs, guides, generated PDFs)
+docs/
