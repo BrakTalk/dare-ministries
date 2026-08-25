@@ -635,6 +635,18 @@ describe('Field note photo preview', () => {
     alt: 'Volunteers repairing a roof',
     is_cover: true,
   };
+  const secondPhoto: PhotoRecord = {
+    id: 'photo-2',
+    url: '/images/field/note-1/photo-2',
+    alt: 'The completed repair',
+    is_cover: false,
+  };
+  const thirdPhoto: PhotoRecord = {
+    id: 'photo-3',
+    url: '/images/field/note-1/photo-3',
+    alt: 'The volunteer team',
+    is_cover: false,
+  };
 
   it('✅ PHOTO-1 opens the selected full-size image in a modal dialog', async () => {
     const note = makeNote({ id: 'note-1', photos: [photo] });
@@ -682,7 +694,74 @@ describe('Field note photo preview', () => {
     expect(hidden('noteOverlay')).toBe(false);
   });
 
-  it('🔒 PHOTO-4 renders an author-provided caption as text in the preview', async () => {
+  it('✅ PHOTO-4 previous and next controls advance one photo and wrap at the ends', async () => {
+    const note = makeNote({ id: 'note-1', photos: [photo, secondPhoto, thirdPhoto] });
+    await boot([note]);
+    openFromList(note.id);
+    document.querySelectorAll<HTMLButtonElement>('.photo-preview-trigger')[1].click();
+
+    const image = $('photoPreviewImage') as HTMLImageElement;
+    expect(image.getAttribute('src')).toBe(secondPhoto.url);
+    expect($('photoPreviewPosition').textContent).toBe('Photo 2 of 3');
+
+    $('photoPreviewNext').click();
+    expect(image.getAttribute('src')).toBe(thirdPhoto.url);
+    expect($('photoPreviewPosition').textContent).toBe('Photo 3 of 3');
+
+    $('photoPreviewPrevious').click();
+    $('photoPreviewPrevious').click();
+    $('photoPreviewPrevious').click();
+    expect(image.getAttribute('src')).toBe(thirdPhoto.url);
+    expect($('photoPreviewPosition').textContent).toBe('Photo 3 of 3');
+
+    $('photoPreviewNext').click();
+    expect(image.getAttribute('src')).toBe(photo.url);
+    expect($('photoPreviewPosition').textContent).toBe('Photo 1 of 3');
+  });
+
+  it('✅ PHOTO-5 ArrowLeft and ArrowRight advance the gallery', async () => {
+    const note = makeNote({ id: 'note-1', photos: [photo, secondPhoto] });
+    await boot([note]);
+    openFromList(note.id);
+    document.querySelector<HTMLButtonElement>('.photo-preview-trigger')!.click();
+
+    const dialog = $('photoPreviewDialog');
+    const image = $('photoPreviewImage') as HTMLImageElement;
+    dialog.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true })
+    );
+    expect(image.getAttribute('src')).toBe(secondPhoto.url);
+
+    dialog.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true, cancelable: true })
+    );
+    expect(image.getAttribute('src')).toBe(photo.url);
+  });
+
+  it('✅ PHOTO-6 clicking the backdrop dismisses the preview but not the editor', async () => {
+    const note = makeNote({ id: 'note-1', photos: [photo, secondPhoto] });
+    await boot([note]);
+    openFromList(note.id);
+    document.querySelector<HTMLButtonElement>('.photo-preview-trigger')!.click();
+
+    $('photoPreviewDialog').click();
+
+    expect(($('photoPreviewDialog') as HTMLDialogElement).open).toBe(false);
+    expect(hidden('noteOverlay')).toBe(false);
+  });
+
+  it('⚠️ PHOTO-7 hides pagination controls when the note has only one photo', async () => {
+    const note = makeNote({ id: 'note-1', photos: [photo] });
+    await boot([note]);
+    openFromList(note.id);
+    document.querySelector<HTMLButtonElement>('.photo-preview-trigger')!.click();
+
+    expect(hidden('photoPreviewPrevious')).toBe(true);
+    expect(hidden('photoPreviewNext')).toBe(true);
+    expect(hidden('photoPreviewPosition')).toBe(true);
+  });
+
+  it('🔒 PHOTO-8 renders an author-provided caption as text in the preview', async () => {
     const unsafePhoto = { ...photo, alt: '<img src=x onerror="window.__pwned=1">' };
     const note = makeNote({ id: 'note-1', photos: [unsafePhoto] });
     await boot([note]);

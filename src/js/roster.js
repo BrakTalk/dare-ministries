@@ -804,17 +804,40 @@ import { logout } from '/js/vendor/netlify-identity.js';
   // ─── Field note photos ──────────────────────────────────────────────────────
 
   let photoPreviewTrigger = null;
+  let photoPreviewPhotos = [];
+  let photoPreviewIndex = -1;
 
-  function openPhotoPreview(url, alt, trigger) {
-    const dialog = $('photoPreviewDialog');
+  function renderPhotoPreview() {
+    const photo = photoPreviewPhotos[photoPreviewIndex];
+    if (!photo) return;
     const caption = $('photoPreviewCaption');
+    const multiple = photoPreviewPhotos.length > 1;
+    $('photoPreviewImage').src = photo.url;
+    $('photoPreviewImage').alt = photo.alt || 'Field note photo';
+    caption.textContent = photo.alt || '';
+    caption.classList.toggle('hidden', !photo.alt);
+    $('photoPreviewPrevious').classList.toggle('hidden', !multiple);
+    $('photoPreviewNext').classList.toggle('hidden', !multiple);
+    $('photoPreviewPosition').textContent =
+      `Photo ${photoPreviewIndex + 1} of ${photoPreviewPhotos.length}`;
+    $('photoPreviewPosition').classList.toggle('hidden', !multiple);
+  }
+
+  function openPhotoPreview(photos, index, trigger) {
+    const dialog = $('photoPreviewDialog');
     photoPreviewTrigger = trigger;
-    $('photoPreviewImage').src = url;
-    $('photoPreviewImage').alt = alt || 'Field note photo';
-    caption.textContent = alt || '';
-    caption.classList.toggle('hidden', !alt);
+    photoPreviewPhotos = photos;
+    photoPreviewIndex = index;
+    renderPhotoPreview();
     dialog.showModal();
     $('photoPreviewClose').focus();
+  }
+
+  function pagePhotoPreview(offset) {
+    if (photoPreviewPhotos.length < 2) return;
+    photoPreviewIndex =
+      (photoPreviewIndex + offset + photoPreviewPhotos.length) % photoPreviewPhotos.length;
+    renderPhotoPreview();
   }
 
   function closePhotoPreview() {
@@ -825,15 +848,28 @@ import { logout } from '/js/vendor/netlify-identity.js';
       photoPreviewTrigger.focus();
     }
     photoPreviewTrigger = null;
+    photoPreviewPhotos = [];
+    photoPreviewIndex = -1;
   }
 
   $('photoPreviewClose').addEventListener('click', closePhotoPreview);
+  $('photoPreviewPrevious').addEventListener('click', () => pagePhotoPreview(-1));
+  $('photoPreviewNext').addEventListener('click', () => pagePhotoPreview(1));
   $('photoPreviewDialog').addEventListener('click', function (e) {
     if (e.target === this) closePhotoPreview();
   });
   $('photoPreviewDialog').addEventListener('cancel', function (e) {
     e.preventDefault();
     closePhotoPreview();
+  });
+  $('photoPreviewDialog').addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      pagePhotoPreview(-1);
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      pagePhotoPreview(1);
+    }
   });
 
   function renderPhotoStrip() {
@@ -861,8 +897,8 @@ import { logout } from '/js/vendor/netlify-identity.js';
       .forEach((thumb) => {
         const id = thumb.dataset.id;
         thumb.querySelector('[data-field="preview"]').addEventListener('click', function () {
-          const photo = photos.find((p) => String(p.id) === id);
-          if (photo) openPhotoPreview(photo.url, photo.alt, this);
+          const index = photos.findIndex((p) => String(p.id) === id);
+          if (index >= 0) openPhotoPreview(photos, index, this);
         });
         thumb.querySelector('[data-field="alt"]').addEventListener('change', async function () {
           try {

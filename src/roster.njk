@@ -263,9 +263,14 @@ eleventyExcludeFromCollections: true
   <!-- Full-size field note photo preview -->
   <dialog id="photoPreviewDialog" class="photo-preview-dialog" aria-label="Full-size field note photo">
     <div class="photo-preview-frame">
-      <button type="button" id="photoPreviewClose" class="photo-preview-close" aria-label="Close full-size photo">&times;</button>
-      <img id="photoPreviewImage" class="photo-preview-image" alt="">
+      <div class="photo-preview-stage">
+        <button type="button" id="photoPreviewClose" class="photo-preview-close" aria-label="Close full-size photo">&times;</button>
+        <button type="button" id="photoPreviewPrevious" class="photo-preview-page photo-preview-page--previous" aria-label="Previous photo">&#8249;</button>
+        <img id="photoPreviewImage" class="photo-preview-image" alt="">
+        <button type="button" id="photoPreviewNext" class="photo-preview-page photo-preview-page--next" aria-label="Next photo">&#8250;</button>
+      </div>
       <p id="photoPreviewCaption" class="photo-preview-caption hidden"></p>
+      <p id="photoPreviewPosition" class="photo-preview-position hidden" aria-live="polite"></p>
     </div>
   </dialog>
 
