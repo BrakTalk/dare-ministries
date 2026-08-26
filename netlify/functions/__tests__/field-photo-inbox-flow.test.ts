@@ -420,6 +420,28 @@ describe('Coordinator Photo Inbox', () => {
     expect(state.dbCalls).toHaveLength(0);
   });
 
+  it('returns 404 before metadata writes when the submission no longer exists', async () => {
+    const response = await adminInboxHandler(
+      adminRequest('PATCH', {
+        submission_id: SUBMISSION_ID,
+        files: [
+          {
+            id: FILE_ID,
+            captured_date: '2026-08-24',
+            location_label: 'Augusta, GA',
+            alt: 'Roof repair crew',
+          },
+        ],
+      })
+    );
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: 'Submission not found.' });
+    expect(state.dbCalls).toHaveLength(1);
+    expect(state.dbCalls[0].text).toMatch(/SELECT id FROM field_photo_submissions/);
+    expect(state.dbCalls.some((call) => /metadata_updated/.test(call.text))).toBe(false);
+  });
+
   it('promotes only selected sanitized photos into the existing Field Note store', async () => {
     onDb(/SELECT id, status FROM field_notes/, [{ id: NOTE_ID, status: 'draft' }]);
     onDb(/SELECT \* FROM field_photo_submission_files/, [

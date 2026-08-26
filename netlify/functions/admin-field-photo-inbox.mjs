@@ -136,6 +136,12 @@ async function saveMetadata(db, session, body) {
     return json({ error: 'Each photo needs a valid id and capture date.' }, 400);
   }
 
+  const submissions = await db.sql`
+    SELECT id FROM field_photo_submissions
+    WHERE id = ${body.submission_id}
+  `;
+  if (!submissions.length) return json({ error: 'Submission not found.' }, 404);
+
   let updated = 0;
   for (const file of files) {
     const rows = await db.sql`
