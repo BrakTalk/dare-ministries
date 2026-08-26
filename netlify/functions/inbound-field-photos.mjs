@@ -17,7 +17,7 @@ export const config = {
 const MAX_ATTACHMENTS = 12;
 const MAX_TOTAL_BYTES = 40 * 1024 * 1024;
 const DOWNLOAD_TIMEOUT_MS = 20_000;
-const RESEND_ATTACHMENT_HOST = 'inbound-cdn.resend.com';
+const RESEND_ATTACHMENT_HOSTS = new Set(['inbound-cdn.resend.com', 'cdn.resend.app']);
 const ALLOWED_DECLARED_TYPES = new Set([
   'image/jpeg',
   'image/png',
@@ -76,7 +76,7 @@ async function downloadAttachment(url, expectedBytes) {
   } catch {
     throw new Error('Resend returned an invalid attachment URL.');
   }
-  if (parsed.protocol !== 'https:' || parsed.hostname !== RESEND_ATTACHMENT_HOST) {
+  if (parsed.protocol !== 'https:' || !RESEND_ATTACHMENT_HOSTS.has(parsed.hostname)) {
     // Log only the parsed hostname. The complete signed URL contains temporary
     // credentials and must never be written to function logs.
     console.error(
