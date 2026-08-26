@@ -7,19 +7,19 @@ import {
   FIELD_PHOTO_INBOX_STORE,
   FIELD_PHOTOS_STORE,
   cleanText,
+  isValidIsoDate,
   isUuid,
   json,
   readBody,
   triggerBuild,
 } from './lib/helpers.mjs';
-import { deleteBlobKeys } from './lib/blob-deletion.mjs';
 import { getCoordinatorSession } from './lib/auth.mjs';
 import { requireSameOrigin } from './lib/portal-auth.mjs';
 import { coordinateGroupLabel } from './lib/field-photo-processing.mjs';
+import { deletePrivatePhotoBlobs } from './lib/field-photo-blob-cleanup.mjs';
 
 export const config = { path: '/api/admin/field-photo-inbox' };
 
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_SELECTION = 12;
 
 function intakeAddress() {
@@ -116,7 +116,7 @@ async function listInbox(db) {
 
 function validatedDate(value) {
   if (value === null || value === '') return null;
-  return typeof value === 'string' && ISO_DATE.test(value) ? value : undefined;
+  return isValidIsoDate(value) ? value : undefined;
 }
 
 async function saveMetadata(db, session, body) {
@@ -183,40 +183,12 @@ async function rejectSubmission(db, session, submissionId) {
   if (!submissions.length) return json({ error: 'Submission not found or already closed.' }, 404);
 
   const files = await db.sql`
-    SELECT inbox_blob_key, thumbnail_blob_key
+    SELECT inbox_blob_key, thumbnail_blob_key, id
     FROM field_photo_submission_files
     WHERE submission_id = ${submissionId} AND status != 'approved'
   `;
   const store = getStore(FIELD_PHOTO_INBOX_STORE);
-  const keys = files
-    .flatMap((file) => [file.inbox_blob_key, file.thumbnail_blob_key])
-    .filter(Boolean);
-  const deletedKeys = await deleteBlobKeys(store, keys);
-  const deletedInboxKeys = files
-    .map((file) => file.inbox_blob_key)
-    .filter((key) => key && deletedKeys.has(key));
-  const deletedThumbnailKeys = files
-    .map((file) => file.thumbnail_blob_key)
-    .filter((key) => key && deletedKeys.has(key));
-
-  if (deletedInboxKeys.length) {
-    await db.sql`
-      UPDATE field_photo_submission_files
-      SET inbox_blob_key = NULL, updated_at = NOW()
-      WHERE submission_id = ${submissionId}
-        AND status != 'approved'
-        AND inbox_blob_key = ANY(${deletedInboxKeys})
-    `;
-  }
-  if (deletedThumbnailKeys.length) {
-    await db.sql`
-      UPDATE field_photo_submission_files
-      SET thumbnail_blob_key = NULL, updated_at = NOW()
-      WHERE submission_id = ${submissionId}
-        AND status != 'approved'
-        AND thumbnail_blob_key = ANY(${deletedThumbnailKeys})
-    `;
-  }
+  await deletePrivatePhotoBlobs(db, store, files);
 
   await db.sql`
       UPDATE field_photo_submission_files
@@ -397,15 +369,7 @@ async function approveFiles(db, session, body) {
     // The sanitized final photo is now durable. Remove the private duplicate
     // and thumbnail; if a transient delete fails, keep the keys in the row so
     // the scheduled retention job can retry without exposing the objects.
-    const privateKeys = [file.inbox_blob_key, file.thumbnail_blob_key].filter(Boolean);
-    const deletedKeys = await deleteBlobKeys(inboxStore, privateKeys);
-    if (deletedKeys.size === privateKeys.length) {
-      await db.sql`
-        UPDATE field_photo_submission_files
-        SET inbox_blob_key = NULL, thumbnail_blob_key = NULL, updated_at = NOW()
-        WHERE id = ${file.id}
-      `.catch(() => {});
-    }
+    await deletePrivatePhotoBlobs(db, inboxStore, [file]).catch(() => {});
   }
 
   if (requestedCover) {

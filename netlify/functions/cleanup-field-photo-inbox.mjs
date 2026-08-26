@@ -3,8 +3,8 @@
 // not outlive the configured review window.
 import { getDatabase } from '@netlify/database';
 import { getStore } from '@netlify/blobs';
-import { deleteBlobKeys } from './lib/blob-deletion.mjs';
 import { FIELD_PHOTO_INBOX_STORE } from './lib/helpers.mjs';
+import { deletePrivatePhotoBlobs } from './lib/field-photo-blob-cleanup.mjs';
 
 export const config = { schedule: '@daily' };
 
@@ -16,6 +16,18 @@ function retentionDays() {
 export default async () => {
   const db = getDatabase();
   const days = retentionDays();
+  const store = getStore(FIELD_PHOTO_INBOX_STORE);
+
+  // Approval and rejection keep a private key whenever immediate deletion
+  // fails. Retry those terminal rows without changing their audit status.
+  const terminalFiles = await db.sql`
+    SELECT id, inbox_blob_key, thumbnail_blob_key
+    FROM field_photo_submission_files
+    WHERE status IN ('approved', 'rejected')
+      AND (inbox_blob_key IS NOT NULL OR thumbnail_blob_key IS NOT NULL)
+  `;
+  await deletePrivatePhotoBlobs(db, store, terminalFiles);
+
   const submissions = await db.sql`
     SELECT id, status
     FROM field_photo_submissions
@@ -37,52 +49,23 @@ export default async () => {
 
   const ids = submissions.map((submission) => submission.id);
   const files = await db.sql`
-    SELECT inbox_blob_key, thumbnail_blob_key
+    SELECT inbox_blob_key, thumbnail_blob_key, id
     FROM field_photo_submission_files
     WHERE submission_id = ANY(${ids})
   `;
-  const store = getStore(FIELD_PHOTO_INBOX_STORE);
-  const keys = files
-    .flatMap((file) => [file.inbox_blob_key, file.thumbnail_blob_key])
-    .filter(Boolean);
-  const deletedKeys = await deleteBlobKeys(store, keys);
-  const deletedInboxKeys = files
-    .map((file) => file.inbox_blob_key)
-    .filter((key) => key && deletedKeys.has(key));
-  const deletedThumbnailKeys = files
-    .map((file) => file.thumbnail_blob_key)
-    .filter((key) => key && deletedKeys.has(key));
-
-  if (deletedInboxKeys.length) {
-    await db.sql`
-      UPDATE field_photo_submission_files
-      SET inbox_blob_key = NULL, updated_at = NOW()
-      WHERE submission_id = ANY(${ids})
-        AND inbox_blob_key = ANY(${deletedInboxKeys})
-    `;
-  }
-  if (deletedThumbnailKeys.length) {
-    await db.sql`
-      UPDATE field_photo_submission_files
-      SET thumbnail_blob_key = NULL, updated_at = NOW()
-      WHERE submission_id = ANY(${ids})
-        AND thumbnail_blob_key = ANY(${deletedThumbnailKeys})
-    `;
-  }
+  await deletePrivatePhotoBlobs(db, store, files);
 
   await db.sql`
     UPDATE field_photo_submission_files
     SET
-      status = CASE WHEN status = 'approved' THEN status ELSE 'rejected' END,
+      status = 'rejected',
       gps_latitude = NULL,
       gps_longitude = NULL,
       exif_subset = '{}'::JSONB,
-      failure_reason = CASE
-        WHEN status = 'approved' THEN failure_reason
-        ELSE 'Expired before coordinator review.'
-      END,
+      failure_reason = 'Expired before coordinator review.',
       updated_at = NOW()
     WHERE submission_id = ANY(${ids})
+      AND status != 'approved'
   `;
   const unreviewedIds = submissions
     .filter((submission) => !['partial', 'rejected'].includes(submission.status))

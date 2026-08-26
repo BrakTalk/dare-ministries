@@ -415,7 +415,7 @@ describe('Coordinator Photo Inbox', () => {
           },
           {
             id: SECOND_FILE_ID,
-            captured_date: 'not-a-date',
+            captured_date: '2026-02-31',
             location_label: 'Augusta, GA',
             alt: 'Completed repair',
           },
@@ -584,7 +584,7 @@ describe('Coordinator Photo Inbox', () => {
     const thumbnailKey = `${SUBMISSION_ID}/${FILE_ID}/thumbnail.jpg`;
     onDb(/SELECT id FROM field_photo_submissions/, [{ id: SUBMISSION_ID }]);
     onDb(/SELECT inbox_blob_key, thumbnail_blob_key/, [
-      { inbox_blob_key: imageKey, thumbnail_blob_key: thumbnailKey },
+      { id: FILE_ID, inbox_blob_key: imageKey, thumbnail_blob_key: thumbnailKey },
     ]);
     state.inboxStore.delete
       .mockRejectedValueOnce(new Error('temporary blob failure'))
@@ -597,16 +597,13 @@ describe('Coordinator Photo Inbox', () => {
     expect(response.status).toBe(200);
     expect(
       state.dbCalls.some(
-        (call) =>
-          /SET inbox_blob_key = NULL/.test(call.text) &&
-          call.values.some((value) => Array.isArray(value) && value.includes(imageKey))
+        (call) => /SET inbox_blob_key = NULL/.test(call.text) && call.values.includes(imageKey)
       )
     ).toBe(false);
     expect(
       state.dbCalls.some(
         (call) =>
-          /SET thumbnail_blob_key = NULL/.test(call.text) &&
-          call.values.some((value) => Array.isArray(value) && value.includes(thumbnailKey))
+          /SET thumbnail_blob_key = NULL/.test(call.text) && call.values.includes(thumbnailKey)
       )
     ).toBe(true);
   });
@@ -619,6 +616,7 @@ describe('Photo Inbox retention', () => {
     ]);
     onDb(/SELECT inbox_blob_key, thumbnail_blob_key/, [
       {
+        id: FILE_ID,
         inbox_blob_key: `${SUBMISSION_ID}/${FILE_ID}/image.jpg`,
         thumbnail_blob_key: `${SUBMISSION_ID}/${FILE_ID}/thumbnail.jpg`,
       },
@@ -644,6 +642,7 @@ describe('Photo Inbox retention', () => {
     onDb(
       /SELECT inbox_blob_key, thumbnail_blob_key/,
       Array.from({ length: 30 }, (_, index) => ({
+        id: `file-${index}`,
         inbox_blob_key: `${SUBMISSION_ID}/file-${index}/image.jpg`,
         thumbnail_blob_key: `${SUBMISSION_ID}/file-${index}/thumbnail.jpg`,
       }))
@@ -679,7 +678,7 @@ describe('Photo Inbox retention', () => {
       { id: SUBMISSION_ID, status: 'rejected' },
     ]);
     onDb(/SELECT inbox_blob_key, thumbnail_blob_key/, [
-      { inbox_blob_key: imageKey, thumbnail_blob_key: thumbnailKey },
+      { id: FILE_ID, inbox_blob_key: imageKey, thumbnail_blob_key: thumbnailKey },
     ]);
     state.inboxStore.delete
       .mockRejectedValueOnce(new Error('temporary blob failure'))
@@ -694,16 +693,13 @@ describe('Photo Inbox retention', () => {
     expect(expiryQuery?.text).toContain('inbox_blob_key IS NOT NULL');
     expect(
       state.dbCalls.some(
-        (call) =>
-          /SET inbox_blob_key = NULL/.test(call.text) &&
-          call.values.some((value) => Array.isArray(value) && value.includes(imageKey))
+        (call) => /SET inbox_blob_key = NULL/.test(call.text) && call.values.includes(imageKey)
       )
     ).toBe(false);
     expect(
       state.dbCalls.some(
         (call) =>
-          /SET thumbnail_blob_key = NULL/.test(call.text) &&
-          call.values.some((value) => Array.isArray(value) && value.includes(thumbnailKey))
+          /SET thumbnail_blob_key = NULL/.test(call.text) && call.values.includes(thumbnailKey)
       )
     ).toBe(true);
     expect(state.dbCalls.some((call) => /UPDATE field_photo_submissions SET/.test(call.text))).toBe(
@@ -714,12 +710,61 @@ describe('Photo Inbox retention', () => {
     ).toBe(false);
   });
 
+  it('retries an approved private blob after a failed deletion without rejecting it', async () => {
+    const imageKey = `${SUBMISSION_ID}/${FILE_ID}/image.jpg`;
+    const thumbnailKey = `${SUBMISSION_ID}/${FILE_ID}/thumbnail.jpg`;
+    onDb(/WHERE status IN \('approved', 'rejected'\)/, [
+      { id: FILE_ID, inbox_blob_key: imageKey, thumbnail_blob_key: thumbnailKey },
+    ]);
+    let imageAttempts = 0;
+    state.inboxStore.delete.mockImplementation(async (key) => {
+      if (key === imageKey && imageAttempts++ === 0) throw new Error('temporary delete failure');
+    });
+
+    await cleanupInboxHandler();
+
+    expect(
+      state.dbCalls.some(
+        (call) => /SET inbox_blob_key = NULL/.test(call.text) && call.values.includes(imageKey)
+      )
+    ).toBe(false);
+    expect(
+      state.dbCalls.some(
+        (call) =>
+          /SET thumbnail_blob_key = NULL/.test(call.text) && call.values.includes(thumbnailKey)
+      )
+    ).toBe(true);
+    expect(state.dbCalls.some((call) => /UPDATE field_photo_submissions/.test(call.text))).toBe(
+      false
+    );
+
+    state.routes = [];
+    onDb(/WHERE status IN \('approved', 'rejected'\)/, [
+      { id: FILE_ID, inbox_blob_key: imageKey, thumbnail_blob_key: null },
+    ]);
+    await cleanupInboxHandler();
+
+    expect(state.inboxStore.delete.mock.calls.filter(([key]) => key === imageKey)).toHaveLength(2);
+    expect(state.inboxStore.delete.mock.calls.filter(([key]) => key === thumbnailKey)).toHaveLength(
+      1
+    );
+    expect(
+      state.dbCalls.some(
+        (call) => /SET inbox_blob_key = NULL/.test(call.text) && call.values.includes(imageKey)
+      )
+    ).toBe(true);
+    expect(state.dbCalls.some((call) => /UPDATE field_photo_submissions/.test(call.text))).toBe(
+      false
+    );
+  });
+
   it('cleans residual private files without overwriting a partial review outcome', async () => {
     onDb(/SELECT id, status FROM field_photo_submissions/, [
       { id: SUBMISSION_ID, status: 'partial' },
     ]);
     onDb(/SELECT inbox_blob_key, thumbnail_blob_key/, [
       {
+        id: FILE_ID,
         inbox_blob_key: `${SUBMISSION_ID}/${FILE_ID}/image.jpg`,
         thumbnail_blob_key: `${SUBMISSION_ID}/${FILE_ID}/thumbnail.jpg`,
       },
