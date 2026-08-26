@@ -30,12 +30,12 @@ jobs:
         uses: github/codeql-action/analyze@v4.37.8
         with:
           category: '/language:${{ matrix.language }}'
-          output: ../results
+          output: results
           upload: never
       - name: Preserve CodeQL results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: codeql-${{ matrix.language }}
-          path: ../results
+          path: results
           retention-days: 14
