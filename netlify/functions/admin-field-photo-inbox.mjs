@@ -12,6 +12,7 @@ import {
   readBody,
   triggerBuild,
 } from './lib/helpers.mjs';
+import { deleteBlobKeys } from './lib/blob-deletion.mjs';
 import { getCoordinatorSession } from './lib/auth.mjs';
 import { requireSameOrigin } from './lib/portal-auth.mjs';
 import { coordinateGroupLabel } from './lib/field-photo-processing.mjs';
@@ -190,14 +191,37 @@ async function rejectSubmission(db, session, submissionId) {
   const keys = files
     .flatMap((file) => [file.inbox_blob_key, file.thumbnail_blob_key])
     .filter(Boolean);
-  await Promise.allSettled(keys.map((key) => store.delete(key)));
+  const deletedKeys = await deleteBlobKeys(store, keys);
+  const deletedInboxKeys = files
+    .map((file) => file.inbox_blob_key)
+    .filter((key) => key && deletedKeys.has(key));
+  const deletedThumbnailKeys = files
+    .map((file) => file.thumbnail_blob_key)
+    .filter((key) => key && deletedKeys.has(key));
+
+  if (deletedInboxKeys.length) {
+    await db.sql`
+      UPDATE field_photo_submission_files
+      SET inbox_blob_key = NULL, updated_at = NOW()
+      WHERE submission_id = ${submissionId}
+        AND status != 'approved'
+        AND inbox_blob_key = ANY(${deletedInboxKeys})
+    `;
+  }
+  if (deletedThumbnailKeys.length) {
+    await db.sql`
+      UPDATE field_photo_submission_files
+      SET thumbnail_blob_key = NULL, updated_at = NOW()
+      WHERE submission_id = ${submissionId}
+        AND status != 'approved'
+        AND thumbnail_blob_key = ANY(${deletedThumbnailKeys})
+    `;
+  }
 
   await db.sql`
       UPDATE field_photo_submission_files
     SET
       status = CASE WHEN status = 'approved' THEN status ELSE 'rejected' END,
-      inbox_blob_key = CASE WHEN status = 'approved' THEN inbox_blob_key ELSE NULL END,
-      thumbnail_blob_key = CASE WHEN status = 'approved' THEN thumbnail_blob_key ELSE NULL END,
       gps_latitude = CASE WHEN status = 'approved' THEN gps_latitude ELSE NULL END,
       gps_longitude = CASE WHEN status = 'approved' THEN gps_longitude ELSE NULL END,
       exif_subset = CASE WHEN status = 'approved' THEN exif_subset ELSE '{}'::JSONB END,

@@ -495,11 +495,45 @@ describe('Coordinator Photo Inbox', () => {
     expect(state.dbCalls.some((call) => /SET is_cover = \(id = \$\)/.test(call.text))).toBe(true);
     expect(state.requireSameOrigin).toHaveBeenCalled();
   });
+
+  it('retains a rejected photo key when private blob deletion fails', async () => {
+    const imageKey = `${SUBMISSION_ID}/${FILE_ID}/image.jpg`;
+    const thumbnailKey = `${SUBMISSION_ID}/${FILE_ID}/thumbnail.jpg`;
+    onDb(/SELECT id FROM field_photo_submissions/, [{ id: SUBMISSION_ID }]);
+    onDb(/SELECT inbox_blob_key, thumbnail_blob_key/, [
+      { inbox_blob_key: imageKey, thumbnail_blob_key: thumbnailKey },
+    ]);
+    state.inboxStore.delete
+      .mockRejectedValueOnce(new Error('temporary blob failure'))
+      .mockResolvedValueOnce(undefined);
+
+    const response = await adminInboxHandler(
+      adminRequest('POST', { action: 'reject', submission_id: SUBMISSION_ID })
+    );
+
+    expect(response.status).toBe(200);
+    expect(
+      state.dbCalls.some(
+        (call) =>
+          /SET inbox_blob_key = NULL/.test(call.text) &&
+          call.values.some((value) => Array.isArray(value) && value.includes(imageKey))
+      )
+    ).toBe(false);
+    expect(
+      state.dbCalls.some(
+        (call) =>
+          /SET thumbnail_blob_key = NULL/.test(call.text) &&
+          call.values.some((value) => Array.isArray(value) && value.includes(thumbnailKey))
+      )
+    ).toBe(true);
+  });
 });
 
 describe('Photo Inbox retention', () => {
   it('deletes expired private blobs and scrubs precise location metadata', async () => {
-    onDb(/SELECT id FROM field_photo_submissions/, [{ id: SUBMISSION_ID }]);
+    onDb(/SELECT id, status FROM field_photo_submissions/, [
+      { id: SUBMISSION_ID, status: 'ready' },
+    ]);
     onDb(/SELECT inbox_blob_key, thumbnail_blob_key/, [
       {
         inbox_blob_key: `${SUBMISSION_ID}/${FILE_ID}/image.jpg`,
@@ -510,7 +544,7 @@ describe('Photo Inbox retention', () => {
     await cleanupInboxHandler();
 
     const expiryQuery = state.dbCalls.find((call) =>
-      /SELECT id FROM field_photo_submissions/.test(call.text)
+      /SELECT id, status FROM field_photo_submissions/.test(call.text)
     );
     expect(expiryQuery?.text).toContain('make_interval(days => $::INTEGER)');
     expect(expiryQuery?.values).toEqual([30]);
@@ -521,7 +555,9 @@ describe('Photo Inbox retention', () => {
   });
 
   it('bounds blob deletion concurrency and inserts audit events in one query', async () => {
-    onDb(/SELECT id FROM field_photo_submissions/, [{ id: SUBMISSION_ID }]);
+    onDb(/SELECT id, status FROM field_photo_submissions/, [
+      { id: SUBMISSION_ID, status: 'ready' },
+    ]);
     onDb(
       /SELECT inbox_blob_key, thumbnail_blob_key/,
       Array.from({ length: 30 }, (_, index) => ({
@@ -551,5 +587,47 @@ describe('Photo Inbox retention', () => {
       JSON.stringify({ retention_days: 30 }),
       [SUBMISSION_ID],
     ]);
+  });
+
+  it('preserves failed blob keys and makes rejected submissions eligible for retry', async () => {
+    const imageKey = `${SUBMISSION_ID}/${FILE_ID}/image.jpg`;
+    const thumbnailKey = `${SUBMISSION_ID}/${FILE_ID}/thumbnail.jpg`;
+    onDb(/SELECT id, status FROM field_photo_submissions/, [
+      { id: SUBMISSION_ID, status: 'rejected' },
+    ]);
+    onDb(/SELECT inbox_blob_key, thumbnail_blob_key/, [
+      { inbox_blob_key: imageKey, thumbnail_blob_key: thumbnailKey },
+    ]);
+    state.inboxStore.delete
+      .mockRejectedValueOnce(new Error('temporary blob failure'))
+      .mockResolvedValueOnce(undefined);
+
+    await cleanupInboxHandler();
+
+    const expiryQuery = state.dbCalls.find((call) =>
+      /SELECT id, status FROM field_photo_submissions/.test(call.text)
+    );
+    expect(expiryQuery?.text).toContain("status = 'rejected'");
+    expect(expiryQuery?.text).toContain('inbox_blob_key IS NOT NULL');
+    expect(
+      state.dbCalls.some(
+        (call) =>
+          /SET inbox_blob_key = NULL/.test(call.text) &&
+          call.values.some((value) => Array.isArray(value) && value.includes(imageKey))
+      )
+    ).toBe(false);
+    expect(
+      state.dbCalls.some(
+        (call) =>
+          /SET thumbnail_blob_key = NULL/.test(call.text) &&
+          call.values.some((value) => Array.isArray(value) && value.includes(thumbnailKey))
+      )
+    ).toBe(true);
+    expect(state.dbCalls.some((call) => /UPDATE field_photo_submissions SET/.test(call.text))).toBe(
+      false
+    );
+    expect(
+      state.dbCalls.some((call) => /INSERT INTO field_photo_submission_events/.test(call.text))
+    ).toBe(false);
   });
 });
