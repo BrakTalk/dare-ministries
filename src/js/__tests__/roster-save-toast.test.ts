@@ -775,6 +775,16 @@ describe('Field note photo preview', () => {
 });
 
 describe('Coordinator session UI', () => {
+  it('✅ AUTH-UI0 provides an explicit route back to the public D.A.R.E. homepage', async () => {
+    await boot();
+
+    const homeLink = document.querySelector<HTMLAnchorElement>(
+      '.roster-header-actions a[href="/"]'
+    );
+    expect(homeLink).toBeTruthy();
+    expect(homeLink?.textContent?.trim()).toBe('D.A.R.E. Home');
+  });
+
   it('❌ AUTH-UI1 redirects an anonymous roster visit to the shared login page', async () => {
     failNext = {
       method: 'GET',

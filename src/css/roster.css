@@ -21,6 +21,24 @@
   color: var(--color-accent-light);
 }
 
+.roster-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+@media (max-width: 480px) {
+  .roster-header {
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  .roster-header-actions {
+    width: 100%;
+    flex-direction: column;
+  }
+}
+
 .hidden {
   display: none !important;
 }
