@@ -334,7 +334,7 @@ describe('Coordinator Photo Inbox', () => {
           },
           {
             id: SECOND_FILE_ID,
-            captured_date: 'not-a-date',
+            captured_date: '2026-02-31',
             location_label: 'Augusta, GA',
             alt: 'Completed repair',
           },

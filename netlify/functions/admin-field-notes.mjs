@@ -4,12 +4,18 @@
 // triggers a rebuild via the BUILD_HOOK_URL hook.
 import { getDatabase } from '@netlify/database';
 import { getStore } from '@netlify/blobs';
-import { json, readBody, cleanText, isUuid, triggerBuild, FIELD_PHOTOS_STORE } from './lib/helpers.mjs';
+import {
+  FIELD_PHOTOS_STORE,
+  cleanText,
+  isValidIsoDate,
+  isUuid,
+  json,
+  readBody,
+  triggerBuild,
+} from './lib/helpers.mjs';
 import { requireAuth } from './lib/auth.mjs';
 
 export const config = { path: '/api/admin/field-notes' };
-
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 function slugify(title, startDate) {
   const base = title
@@ -65,10 +71,10 @@ export default async (req) => {
     const startDate = cleanText(body.start_date, 10);
     const endDate = cleanText(body.end_date, 10);
     if (!title) return json({ error: 'Title is required' }, 400);
-    if (!startDate || !ISO_DATE.test(startDate)) {
+    if (!isValidIsoDate(startDate)) {
       return json({ error: 'A valid start date is required' }, 400);
     }
-    if (endDate && !ISO_DATE.test(endDate)) return json({ error: 'Invalid end date' }, 400);
+    if (endDate && !isValidIsoDate(endDate)) return json({ error: 'Invalid end date' }, 400);
 
     const row = await insertWithUniqueSlug(db, {
       title,
@@ -94,10 +100,10 @@ export default async (req) => {
     const noteBody = body.body !== undefined ? cleanText(body.body, 50000) || '' : existing.body;
 
     if (!title) return json({ error: 'Title is required' }, 400);
-    if (!startDate || !ISO_DATE.test(startDate)) {
+    if (!isValidIsoDate(startDate)) {
       return json({ error: 'A valid start date is required' }, 400);
     }
-    if (endDate && !ISO_DATE.test(endDate)) return json({ error: 'Invalid end date' }, 400);
+    if (endDate && !isValidIsoDate(endDate)) return json({ error: 'Invalid end date' }, 400);
 
     // Slugs follow the title/dates only until the entry has ever been
     // published — once a URL may be out in the wild it stays stable.

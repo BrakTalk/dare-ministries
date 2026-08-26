@@ -7,6 +7,7 @@ import {
   FIELD_PHOTO_INBOX_STORE,
   FIELD_PHOTOS_STORE,
   cleanText,
+  isValidIsoDate,
   isUuid,
   json,
   readBody,
@@ -18,7 +19,6 @@ import { coordinateGroupLabel } from './lib/field-photo-processing.mjs';
 
 export const config = { path: '/api/admin/field-photo-inbox' };
 
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_SELECTION = 12;
 
 function intakeAddress() {
@@ -115,7 +115,7 @@ async function listInbox(db) {
 
 function validatedDate(value) {
   if (value === null || value === '') return null;
-  return typeof value === 'string' && ISO_DATE.test(value) ? value : undefined;
+  return isValidIsoDate(value) ? value : undefined;
 }
 
 async function saveMetadata(db, session, body) {
