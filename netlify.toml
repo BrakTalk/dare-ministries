@@ -4,3 +4,12 @@
 
 [build.environment]
   NODE_VERSION = "20"
+
+[functions.inbound-field-photos]
+  included_files = ["netlify/functions/vendor/heic-decoder/**"]
+
+[functions.heic-decoder-health]
+  included_files = [
+    "netlify/functions/vendor/heic-decoder/**",
+    "netlify/functions/__tests__/fixtures/heic/no-exif.heic"
+  ]

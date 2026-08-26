@@ -1,12 +1,31 @@
-import { describe, expect, it } from 'vitest';
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import sharp from 'sharp';
+
+const state = vi.hoisted(() => ({
+  decodeHeic: vi.fn(),
+}));
+
+vi.mock('../lib/heic-decoder.mjs', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../lib/heic-decoder.mjs')>()),
+  decodeHeic: (...args: unknown[]) => state.decodeHeic(...args),
+}));
+
 import {
   coordinateGroupLabel,
+  detectFieldPhotoFormat,
   normalizeExifMetadata,
   parseExifDate,
   parseExifOffset,
   processFieldPhoto,
 } from '../lib/field-photo-processing.mjs';
+
+const fixtureDirectory = resolve(process.cwd(), 'netlify/functions/__tests__/fixtures/heic');
+
+beforeEach(() => {
+  state.decodeHeic.mockReset();
+});
 
 describe('field photo EXIF normalization', () => {
   it('normalizes capture time, timezone offset, and GPS without converting local wall time', () => {
@@ -75,5 +94,84 @@ describe('field photo image rewriting', () => {
 
   it('rejects empty input before invoking the image decoder', async () => {
     await expect(processFieldPhoto(Buffer.alloc(0))).rejects.toThrow('empty');
+  });
+
+  it.each(['jpeg', 'png', 'webp', 'avif'] as const)(
+    'preserves %s intake while producing metadata-free JPEGs',
+    async (format) => {
+      const source = await sharp({
+        create: { width: 96, height: 64, channels: 3, background: '#315c76' },
+      })
+        .toFormat(format)
+        .toBuffer();
+
+      expect(detectFieldPhotoFormat(source)).toBe(format);
+      const processed = await processFieldPhoto(source, {
+        declaredType: `image/${format}`,
+      });
+      const metadata = await sharp(processed.image).metadata();
+
+      expect(processed.contentType).toBe('image/jpeg');
+      expect(metadata.format).toBe('jpeg');
+      expect(metadata.exif).toBeUndefined();
+      expect(metadata.icc).toBeUndefined();
+    }
+  );
+
+  it('rejects a MIME-spoofed non-HEIC file based on its real signature', async () => {
+    const png = await sharp({
+      create: { width: 32, height: 24, channels: 3, background: '#315c76' },
+    })
+      .png()
+      .toBuffer();
+
+    await expect(
+      processFieldPhoto(png, { declaredType: 'image/heic', heicEnabled: true })
+    ).rejects.toThrow('do not match');
+    expect(state.decodeHeic).not.toHaveBeenCalled();
+  });
+
+  it('keeps HEIC fail-closed while the rollout flag is disabled', async () => {
+    const source = await readFile(resolve(fixtureDirectory, 'no-exif.heic'));
+
+    await expect(
+      processFieldPhoto(source, { declaredType: 'image/heic', heicEnabled: false })
+    ).rejects.toThrow('not enabled');
+    expect(state.decodeHeic).not.toHaveBeenCalled();
+  });
+
+  it('passes bounded HEIC RGB output through the existing Sharp derivative pipeline', async () => {
+    const source = await readFile(resolve(fixtureDirectory, 'no-exif.heic'));
+    state.decodeHeic.mockResolvedValue({
+      pixels: Buffer.alloc(120 * 80 * 3, 96),
+      exif: Buffer.alloc(0),
+      width: 120,
+      height: 80,
+      channels: 3,
+      auxiliaryImages: 0,
+      hasDepth: false,
+      decoderVersion: 'libheif 1.23.1 + libde265 1.1.1',
+    });
+
+    const processed = await processFieldPhoto(source, {
+      declaredType: 'image/heic',
+      heicEnabled: true,
+    });
+    const imageMetadata = await sharp(processed.image).metadata();
+
+    expect(state.decodeHeic).toHaveBeenCalledWith(source, undefined);
+    expect(processed).toMatchObject({ width: 120, height: 80, contentType: 'image/jpeg' });
+    expect(imageMetadata.exif).toBeUndefined();
+    expect(imageMetadata.icc).toBeUndefined();
+  });
+
+  it('rejects sequence brands before allocating a decoder raster', async () => {
+    const sequence = await readFile(resolve(fixtureDirectory, 'timed-sequence.heic'));
+
+    expect(detectFieldPhotoFormat(sequence)).toBe('heif-sequence');
+    await expect(
+      processFieldPhoto(sequence, { declaredType: 'image/heic', heicEnabled: true })
+    ).rejects.toThrow('sequences and videos');
+    expect(state.decodeHeic).not.toHaveBeenCalled();
   });
 });

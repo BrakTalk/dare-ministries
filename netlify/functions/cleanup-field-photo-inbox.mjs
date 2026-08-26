@@ -29,10 +29,21 @@ export default async () => {
   await deletePrivatePhotoBlobs(db, store, terminalFiles);
 
   const submissions = await db.sql`
-    SELECT id
+    SELECT id, status
     FROM field_photo_submissions
-    WHERE status IN ('processing', 'ready', 'partial', 'failed', 'no_photos')
-      AND received_at < NOW() - make_interval(days => ${days}::INTEGER)
+    WHERE received_at < NOW() - make_interval(days => ${days}::INTEGER)
+      AND (
+        status IN ('processing', 'ready', 'partial', 'failed', 'no_photos')
+        OR (
+          status = 'rejected'
+          AND EXISTS (
+            SELECT 1
+            FROM field_photo_submission_files
+            WHERE submission_id = field_photo_submissions.id
+              AND (inbox_blob_key IS NOT NULL OR thumbnail_blob_key IS NOT NULL)
+          )
+        )
+      )
   `;
   if (!submissions.length) return;
 
@@ -56,19 +67,24 @@ export default async () => {
     WHERE submission_id = ANY(${ids})
       AND status != 'approved'
   `;
-  await db.sql`
-    UPDATE field_photo_submissions
-    SET
-      status = 'rejected',
-      failure_reason = 'Expired before coordinator review.',
-      reviewed_at = NOW(),
-      updated_at = NOW()
-    WHERE id = ANY(${ids})
-  `;
-  await db.sql`
-    INSERT INTO field_photo_submission_events (submission_id, action, details)
-    SELECT expired.submission_id, 'expired',
-      ${JSON.stringify({ retention_days: days })}::JSONB
-    FROM UNNEST(${ids}::UUID[]) AS expired(submission_id)
-  `;
+  const unreviewedIds = submissions
+    .filter((submission) => !['partial', 'rejected'].includes(submission.status))
+    .map((submission) => submission.id);
+  if (unreviewedIds.length) {
+    await db.sql`
+      UPDATE field_photo_submissions
+      SET
+        status = 'rejected',
+        failure_reason = 'Expired before coordinator review.',
+        reviewed_at = NOW(),
+        updated_at = NOW()
+      WHERE id = ANY(${unreviewedIds})
+    `;
+    await db.sql`
+      INSERT INTO field_photo_submission_events (submission_id, action, details)
+      SELECT expired.submission_id, 'expired',
+        ${JSON.stringify({ retention_days: days })}::JSONB
+      FROM UNNEST(${unreviewedIds}::UUID[]) AS expired(submission_id)
+    `;
+  }
 };

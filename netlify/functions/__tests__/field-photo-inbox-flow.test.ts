@@ -185,21 +185,33 @@ beforeEach(() => {
   }
   vi.stubGlobal(
     'fetch',
-    vi.fn().mockResolvedValue(
-      new Response(Buffer.from('original-image'), {
-        status: 200,
-        headers: { 'Content-Length': '14', 'Content-Type': 'image/jpeg' },
-      })
+    vi.fn().mockImplementation(
+      async () =>
+        new Response(Buffer.from('original-image'), {
+          status: 200,
+          headers: { 'Content-Length': '14', 'Content-Type': 'image/jpeg' },
+        })
     )
   );
   process.env.RESEND_API_KEY = 're_test';
   process.env.RESEND_WEBHOOK_SECRET = 'whsec_test';
   process.env.FIELD_PHOTO_INBOX_RECIPIENTS = 'photos@inbound.example';
   delete process.env.FIELD_PHOTO_ALLOWED_SENDERS;
+  delete process.env.FIELD_PHOTO_HEIC_ENABLED;
   delete process.env.BUILD_HOOK_URL;
 });
 
 describe('Resend field photo ingestion', () => {
+  it('fails the background invocation when required configuration is missing', async () => {
+    delete process.env.RESEND_API_KEY;
+
+    await expect(inboundHandler(webhookRequest())).rejects.toThrow(
+      'Field photo intake is not configured.'
+    );
+    expect(state.verify).not.toHaveBeenCalled();
+    expect(state.getDatabase).not.toHaveBeenCalled();
+  });
+
   it('rejects an invalid webhook before database or blob access', async () => {
     state.verify.mockImplementation(() => {
       throw new Error('bad signature');
@@ -230,7 +242,9 @@ describe('Resend field photo ingestion', () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true, photos: 1 });
-    expect(state.processFieldPhoto).toHaveBeenCalledWith(Buffer.from('original-image'));
+    expect(state.processFieldPhoto).toHaveBeenCalledWith(Buffer.from('original-image'), {
+      declaredType: 'image/jpeg',
+    });
     expect(state.inboxStore.set).toHaveBeenNthCalledWith(
       1,
       `${SUBMISSION_ID}/${FILE_ID}/image.jpg`,
@@ -251,8 +265,9 @@ describe('Resend field photo ingestion', () => {
     expect(metadataUpdate?.values).toContain(-82.0105);
   });
 
-  it('records HEIC attachments as unsupported without downloading them', async () => {
+  it('processes a declared HEIC attachment into the same private quarantine', async () => {
     onDb(/INSERT INTO field_photo_submissions/, [{ id: SUBMISSION_ID, status: 'processing' }]);
+    onDb(/INSERT INTO field_photo_submission_files/, [{ id: FILE_ID, status: 'processing' }]);
     state.receivingGet.mockResolvedValue({
       data: {
         attachments: [
@@ -266,18 +281,84 @@ describe('Resend field photo ingestion', () => {
       },
       error: null,
     });
+    state.attachmentGet.mockResolvedValue({
+      data: {
+        id: ATTACHMENT_ID,
+        size: 2048,
+        content_type: 'image/heic',
+        download_url: `https://inbound-cdn.resend.com/${EMAIL_ID}/attachments/${ATTACHMENT_ID}?signature=test`,
+      },
+      error: null,
+    });
 
     const response = await inboundHandler(webhookRequest());
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ ok: true, photos: 0 });
-    expect(state.attachmentGet).not.toHaveBeenCalled();
-    expect(state.processFieldPhoto).not.toHaveBeenCalled();
-    const failedFileInsert = state.dbCalls.find((call) =>
-      /INSERT INTO field_photo_submission_files/.test(call.text)
-    );
-    expect(failedFileInsert?.values).toContain('image/heic');
-    expect(failedFileInsert?.values).toContain('The attachment is not a supported photo type.');
+    expect(await response.json()).toEqual({ ok: true, photos: 1 });
+    expect(state.processFieldPhoto).toHaveBeenCalledWith(Buffer.from('original-image'), {
+      declaredType: 'image/heic',
+    });
+    expect(state.inboxStore.set).toHaveBeenCalledTimes(2);
+  });
+
+  it('continues sequentially after one attachment fails', async () => {
+    onDb(/INSERT INTO field_photo_submissions/, [{ id: SUBMISSION_ID, status: 'processing' }]);
+    onDb(/INSERT INTO field_photo_submission_files/, [{ id: FILE_ID, status: 'processing' }]);
+    state.receivingGet.mockResolvedValue({
+      data: {
+        attachments: [
+          { id: ATTACHMENT_ID, filename: 'bad.heic', size: 512, content_type: 'image/heic' },
+          { id: 'second-attachment', filename: 'good.jpg', size: 512, content_type: 'image/jpeg' },
+        ],
+      },
+      error: null,
+    });
+    state.attachmentGet
+      .mockResolvedValueOnce({
+        data: {
+          id: ATTACHMENT_ID,
+          size: 512,
+          content_type: 'image/heic',
+          download_url: `https://inbound-cdn.resend.com/${EMAIL_ID}/attachments/${ATTACHMENT_ID}?signature=test`,
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: {
+          id: 'second-attachment',
+          size: 512,
+          content_type: 'image/jpeg',
+          download_url: `https://inbound-cdn.resend.com/${EMAIL_ID}/attachments/second-attachment?signature=test`,
+        },
+        error: null,
+      });
+    state.processFieldPhoto
+      .mockRejectedValueOnce(new Error('The HEIC photo could not be decoded safely.'))
+      .mockResolvedValueOnce({
+        image: Buffer.from('sanitized-image'),
+        thumbnail: Buffer.from('thumbnail'),
+        contentType: 'image/jpeg',
+        byteSize: 15,
+        width: 1600,
+        height: 900,
+        sha256: 'a'.repeat(64),
+        capturedAtLocal: null,
+        capturedOffsetMinutes: null,
+        capturedDate: null,
+        gpsLatitude: null,
+        gpsLongitude: null,
+        exifSubset: {},
+      });
+
+    const response = await inboundHandler(webhookRequest());
+
+    expect(await response.json()).toEqual({ ok: true, photos: 1 });
+    expect(state.processFieldPhoto).toHaveBeenNthCalledWith(1, Buffer.from('original-image'), {
+      declaredType: 'image/heic',
+    });
+    expect(state.processFieldPhoto).toHaveBeenNthCalledWith(2, Buffer.from('original-image'), {
+      declaredType: 'image/jpeg',
+    });
   });
 });
 
@@ -349,6 +430,28 @@ describe('Coordinator Photo Inbox', () => {
     expect(state.dbCalls).toHaveLength(0);
   });
 
+  it('returns 404 before metadata writes when the submission no longer exists', async () => {
+    const response = await adminInboxHandler(
+      adminRequest('PATCH', {
+        submission_id: SUBMISSION_ID,
+        files: [
+          {
+            id: FILE_ID,
+            captured_date: '2026-08-24',
+            location_label: 'Augusta, GA',
+            alt: 'Roof repair crew',
+          },
+        ],
+      })
+    );
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: 'Submission not found.' });
+    expect(state.dbCalls).toHaveLength(1);
+    expect(state.dbCalls[0].text).toMatch(/SELECT id FROM field_photo_submissions/);
+    expect(state.dbCalls.some((call) => /metadata_updated/.test(call.text))).toBe(false);
+  });
+
   it('promotes only selected sanitized photos into the existing Field Note store', async () => {
     onDb(/SELECT id, status FROM field_notes/, [{ id: NOTE_ID, status: 'draft' }]);
     onDb(/SELECT \* FROM field_photo_submission_files/, [
@@ -365,7 +468,8 @@ describe('Coordinator Photo Inbox', () => {
       },
     ]);
     onDb(/SELECT COALESCE\(MAX\(sort_order\)/, [{ max_order: -1 }]);
-    onDb(/SELECT COUNT\(\*\)::INTEGER AS count/, [{ count: 0 }]);
+    onDb(/SELECT id FROM approved_file/, [{ id: FILE_ID }]);
+    onDb(/COUNT\(\*\) FILTER \(WHERE status = 'ready'\)/, [{ ready_count: 0, approved_count: 1 }]);
     state.inboxStore.get.mockResolvedValue(Buffer.from('sanitized-image').buffer);
 
     const response = await adminInboxHandler(
@@ -397,16 +501,119 @@ describe('Coordinator Photo Inbox', () => {
       /INSERT INTO field_note_photos/.test(call.text)
     );
     expect(publicPhotoInsert).toBeDefined();
-    expect(publicPhotoInsert?.text).not.toContain('gps_latitude');
-    expect(publicPhotoInsert?.text).not.toContain('gps_longitude');
+    const insertedPhotoSql = publicPhotoInsert?.text.split('approved_file AS')[0];
+    expect(insertedPhotoSql).not.toContain('gps_latitude');
+    expect(insertedPhotoSql).not.toContain('gps_longitude');
     expect(state.dbCalls.some((call) => /SET is_cover = \(id = \$\)/.test(call.text))).toBe(true);
     expect(state.requireSameOrigin).toHaveBeenCalled();
+  });
+
+  it('keeps later approval failures retryable and reports partial success', async () => {
+    onDb(/SELECT id, status FROM field_notes/, [{ id: NOTE_ID, status: 'draft' }]);
+    onDb(/SELECT \* FROM field_photo_submission_files/, [
+      {
+        id: FILE_ID,
+        submission_id: SUBMISSION_ID,
+        status: 'ready',
+        inbox_blob_key: `${SUBMISSION_ID}/${FILE_ID}/image.jpg`,
+        thumbnail_blob_key: `${SUBMISSION_ID}/${FILE_ID}/thumbnail.jpg`,
+        captured_date: '2026-08-24',
+        location_label: null,
+        exif_subset: {},
+      },
+      {
+        id: SECOND_FILE_ID,
+        submission_id: SUBMISSION_ID,
+        status: 'ready',
+        inbox_blob_key: `${SUBMISSION_ID}/${SECOND_FILE_ID}/image.jpg`,
+        thumbnail_blob_key: `${SUBMISSION_ID}/${SECOND_FILE_ID}/thumbnail.jpg`,
+        captured_date: '2026-08-24',
+        location_label: null,
+        exif_subset: {},
+      },
+    ]);
+    onDb(/SELECT COALESCE\(MAX\(sort_order\)/, [{ max_order: -1 }]);
+    onDb(/SELECT id FROM approved_file/, [{ id: FILE_ID }]);
+    onDb(/COUNT\(\*\) FILTER \(WHERE status = 'ready'\)/, [{ ready_count: 1, approved_count: 1 }]);
+    state.inboxStore.get.mockResolvedValue(Buffer.from('sanitized-image').buffer);
+    state.finalStore.set
+      .mockResolvedValueOnce({})
+      .mockRejectedValueOnce(new Error('temporary public blob failure'));
+
+    const response = await adminInboxHandler(
+      adminRequest('POST', {
+        action: 'approve',
+        submission_id: SUBMISSION_ID,
+        note_id: NOTE_ID,
+        files: [
+          { id: FILE_ID, captured_date: '2026-08-24' },
+          { id: SECOND_FILE_ID, captured_date: '2026-08-24' },
+        ],
+      })
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      ok: false,
+      approved: [{ file_id: FILE_ID }],
+      failures: [
+        {
+          file_id: SECOND_FILE_ID,
+          error: 'This photo could not be approved. It remains in the inbox to retry.',
+        },
+      ],
+      status: 'partial',
+    });
+    expect(state.finalStore.set).toHaveBeenCalledTimes(2);
+    expect(state.finalStore.delete).toHaveBeenCalledTimes(1);
+    expect(
+      state.dbCalls.some(
+        (call) =>
+          /UPDATE field_photo_submissions/.test(call.text) && call.values.includes('partial')
+      )
+    ).toBe(true);
+    const event = state.dbCalls.find((call) =>
+      /INSERT INTO field_photo_submission_events/.test(call.text)
+    );
+    expect(event?.values.some((value) => String(value).includes(SECOND_FILE_ID))).toBe(true);
+  });
+
+  it('retains a rejected photo key when private blob deletion fails', async () => {
+    const imageKey = `${SUBMISSION_ID}/${FILE_ID}/image.jpg`;
+    const thumbnailKey = `${SUBMISSION_ID}/${FILE_ID}/thumbnail.jpg`;
+    onDb(/SELECT id FROM field_photo_submissions/, [{ id: SUBMISSION_ID }]);
+    onDb(/SELECT inbox_blob_key, thumbnail_blob_key/, [
+      { id: FILE_ID, inbox_blob_key: imageKey, thumbnail_blob_key: thumbnailKey },
+    ]);
+    state.inboxStore.delete
+      .mockRejectedValueOnce(new Error('temporary blob failure'))
+      .mockResolvedValueOnce(undefined);
+
+    const response = await adminInboxHandler(
+      adminRequest('POST', { action: 'reject', submission_id: SUBMISSION_ID })
+    );
+
+    expect(response.status).toBe(200);
+    expect(
+      state.dbCalls.some(
+        (call) => /SET inbox_blob_key = NULL/.test(call.text) && call.values.includes(imageKey)
+      )
+    ).toBe(false);
+    expect(
+      state.dbCalls.some(
+        (call) =>
+          /SET thumbnail_blob_key = NULL/.test(call.text) && call.values.includes(thumbnailKey)
+      )
+    ).toBe(true);
   });
 });
 
 describe('Photo Inbox retention', () => {
   it('deletes expired private blobs and scrubs precise location metadata', async () => {
-    onDb(/SELECT id FROM field_photo_submissions/, [{ id: SUBMISSION_ID }]);
+    onDb(/SELECT id, status FROM field_photo_submissions/, [
+      { id: SUBMISSION_ID, status: 'ready' },
+    ]);
     onDb(/SELECT inbox_blob_key, thumbnail_blob_key/, [
       {
         id: FILE_ID,
@@ -418,7 +625,7 @@ describe('Photo Inbox retention', () => {
     await cleanupInboxHandler();
 
     const expiryQuery = state.dbCalls.find((call) =>
-      /SELECT id FROM field_photo_submissions/.test(call.text)
+      /SELECT id, status FROM field_photo_submissions/.test(call.text)
     );
     expect(expiryQuery?.text).toContain('make_interval(days => $::INTEGER)');
     expect(expiryQuery?.values).toEqual([30]);
@@ -429,7 +636,9 @@ describe('Photo Inbox retention', () => {
   });
 
   it('bounds blob deletion concurrency and inserts audit events in one query', async () => {
-    onDb(/SELECT id FROM field_photo_submissions/, [{ id: SUBMISSION_ID }]);
+    onDb(/SELECT id, status FROM field_photo_submissions/, [
+      { id: SUBMISSION_ID, status: 'ready' },
+    ]);
     onDb(
       /SELECT inbox_blob_key, thumbnail_blob_key/,
       Array.from({ length: 30 }, (_, index) => ({
@@ -460,6 +669,45 @@ describe('Photo Inbox retention', () => {
       JSON.stringify({ retention_days: 30 }),
       [SUBMISSION_ID],
     ]);
+  });
+
+  it('preserves failed blob keys and makes rejected submissions eligible for retry', async () => {
+    const imageKey = `${SUBMISSION_ID}/${FILE_ID}/image.jpg`;
+    const thumbnailKey = `${SUBMISSION_ID}/${FILE_ID}/thumbnail.jpg`;
+    onDb(/SELECT id, status FROM field_photo_submissions/, [
+      { id: SUBMISSION_ID, status: 'rejected' },
+    ]);
+    onDb(/SELECT inbox_blob_key, thumbnail_blob_key/, [
+      { id: FILE_ID, inbox_blob_key: imageKey, thumbnail_blob_key: thumbnailKey },
+    ]);
+    state.inboxStore.delete
+      .mockRejectedValueOnce(new Error('temporary blob failure'))
+      .mockResolvedValueOnce(undefined);
+
+    await cleanupInboxHandler();
+
+    const expiryQuery = state.dbCalls.find((call) =>
+      /SELECT id, status FROM field_photo_submissions/.test(call.text)
+    );
+    expect(expiryQuery?.text).toContain("status = 'rejected'");
+    expect(expiryQuery?.text).toContain('inbox_blob_key IS NOT NULL');
+    expect(
+      state.dbCalls.some(
+        (call) => /SET inbox_blob_key = NULL/.test(call.text) && call.values.includes(imageKey)
+      )
+    ).toBe(false);
+    expect(
+      state.dbCalls.some(
+        (call) =>
+          /SET thumbnail_blob_key = NULL/.test(call.text) && call.values.includes(thumbnailKey)
+      )
+    ).toBe(true);
+    expect(state.dbCalls.some((call) => /UPDATE field_photo_submissions SET/.test(call.text))).toBe(
+      false
+    );
+    expect(
+      state.dbCalls.some((call) => /INSERT INTO field_photo_submission_events/.test(call.text))
+    ).toBe(false);
   });
 
   it('retries an approved private blob after a failed deletion without rejecting it', async () => {
@@ -497,7 +745,9 @@ describe('Photo Inbox retention', () => {
     await cleanupInboxHandler();
 
     expect(state.inboxStore.delete.mock.calls.filter(([key]) => key === imageKey)).toHaveLength(2);
-    expect(state.inboxStore.delete.mock.calls.filter(([key]) => key === thumbnailKey)).toHaveLength(1);
+    expect(state.inboxStore.delete.mock.calls.filter(([key]) => key === thumbnailKey)).toHaveLength(
+      1
+    );
     expect(
       state.dbCalls.some(
         (call) => /SET inbox_blob_key = NULL/.test(call.text) && call.values.includes(imageKey)
@@ -506,5 +756,29 @@ describe('Photo Inbox retention', () => {
     expect(state.dbCalls.some((call) => /UPDATE field_photo_submissions/.test(call.text))).toBe(
       false
     );
+  });
+
+  it('cleans residual private files without overwriting a partial review outcome', async () => {
+    onDb(/SELECT id, status FROM field_photo_submissions/, [
+      { id: SUBMISSION_ID, status: 'partial' },
+    ]);
+    onDb(/SELECT inbox_blob_key, thumbnail_blob_key/, [
+      {
+        id: FILE_ID,
+        inbox_blob_key: `${SUBMISSION_ID}/${FILE_ID}/image.jpg`,
+        thumbnail_blob_key: `${SUBMISSION_ID}/${FILE_ID}/thumbnail.jpg`,
+      },
+    ]);
+
+    await cleanupInboxHandler();
+
+    expect(state.inboxStore.delete).toHaveBeenCalledTimes(2);
+    expect(state.dbCalls.some((call) => /gps_latitude = NULL/.test(call.text))).toBe(true);
+    expect(state.dbCalls.some((call) => /UPDATE field_photo_submissions SET/.test(call.text))).toBe(
+      false
+    );
+    expect(
+      state.dbCalls.some((call) => /INSERT INTO field_photo_submission_events/.test(call.text))
+    ).toBe(false);
   });
 });

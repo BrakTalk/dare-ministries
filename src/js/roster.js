@@ -766,7 +766,9 @@ import { logout } from '/js/vendor/netlify-identity.js';
 
   function collectInboxFiles(card, selectedOnly) {
     return Array.from(card.querySelectorAll('.photo-inbox-file[data-file-id]'))
-      .filter((fileCard) => !selectedOnly || fileCard.querySelector('[data-field="selected"]').checked)
+      .filter(
+        (fileCard) => !selectedOnly || fileCard.querySelector('[data-field="selected"]').checked
+      )
       .map((fileCard) => ({
         id: fileCard.dataset.fileId,
         alt: fileCard.querySelector('[data-field="alt"]').value.trim(),
@@ -785,7 +787,10 @@ import { logout } from '/js/vendor/netlify-identity.js';
         const fileCard = this.closest('[data-file-id]');
         const photos = submission.files
           .filter((file) => file.status === 'ready')
-          .map((file) => ({ url: file.preview_url, alt: file.alt || file.original_filename || '' }));
+          .map((file) => ({
+            url: file.preview_url,
+            alt: file.alt || file.original_filename || '',
+          }));
         const index = submission.files
           .filter((file) => file.status === 'ready')
           .findIndex((file) => file.id === fileCard.dataset.fileId);
@@ -794,7 +799,8 @@ import { logout } from '/js/vendor/netlify-identity.js';
     });
     card.querySelectorAll('[data-field="cover"]').forEach((radio) => {
       radio.addEventListener('change', function () {
-        if (this.checked) this.closest('[data-file-id]').querySelector('[data-field="selected"]').checked = true;
+        if (this.checked)
+          this.closest('[data-file-id]').querySelector('[data-field="selected"]').checked = true;
       });
     });
 
@@ -803,7 +809,10 @@ import { logout } from '/js/vendor/netlify-identity.js';
       try {
         await api('/api/admin/field-photo-inbox', {
           method: 'PATCH',
-          body: JSON.stringify({ submission_id: submissionId, files: collectInboxFiles(card, false) }),
+          body: JSON.stringify({
+            submission_id: submissionId,
+            files: collectInboxFiles(card, false),
+          }),
         });
         await loadPhotoInbox();
         showToast('Photo details saved.');
@@ -821,12 +830,25 @@ import { logout } from '/js/vendor/netlify-identity.js';
       if (!files.length) return alert('Select at least one photo.');
       this.disabled = true;
       try {
-        await api('/api/admin/field-photo-inbox', {
+        const result = await api('/api/admin/field-photo-inbox', {
           method: 'POST',
-          body: JSON.stringify({ action: 'approve', submission_id: submissionId, note_id: noteId, files }),
+          body: JSON.stringify({
+            action: 'approve',
+            submission_id: submissionId,
+            note_id: noteId,
+            files,
+          }),
         });
         await Promise.all([loadPhotoInbox(), loadFieldNotes()]);
-        showToast(`${files.length} photo${files.length === 1 ? '' : 's'} approved.`);
+        const approvedCount = Array.isArray(result.approved) ? result.approved.length : 0;
+        const failedCount = Array.isArray(result.failures) ? result.failures.length : 0;
+        if (failedCount) {
+          showToast(
+            `${approvedCount} photo${approvedCount === 1 ? '' : 's'} approved; ${failedCount} remain in the inbox to retry.`
+          );
+        } else {
+          showToast(`${approvedCount} photo${approvedCount === 1 ? '' : 's'} approved.`);
+        }
       } catch (error) {
         alert('Could not approve photos: ' + error.message);
       } finally {

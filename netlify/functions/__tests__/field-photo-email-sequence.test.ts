@@ -155,11 +155,22 @@ function approvalBody(files: ApprovalFileInput[] = [{ id: FILE_ID }]) {
   };
 }
 
-function configureApproval(noteStatus = 'draft', files = [readyInboxFile()], remaining = 0) {
+function configureApproval(
+  noteStatus = 'draft',
+  files = [readyInboxFile()],
+  readyCount = 0,
+  approvedCount = 1
+) {
   onDb(/SELECT id, status FROM field_notes/, [{ id: NOTE_ID, status: noteStatus }]);
   onDb(/SELECT \* FROM field_photo_submission_files/, files);
   onDb(/SELECT COALESCE\(MAX\(sort_order\)/, [{ max_order: -1 }]);
-  onDb(/SELECT COUNT\(\*\)::INTEGER AS count/, [{ count: remaining }]);
+  onDb(
+    /SELECT id FROM approved_file/,
+    files.map((file) => ({ id: file.id }))
+  );
+  onDb(/COUNT\(\*\) FILTER \(WHERE status = 'ready'\)/, [
+    { ready_count: readyCount, approved_count: approvedCount },
+  ]);
 }
 
 function failedFileCall() {
@@ -271,9 +282,10 @@ describe('Phase: Webhook authentication and admission', () => {
     delete process.env.RESEND_WEBHOOK_SECRET;
     const errorLog = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
-    const response = await inboundHandler(webhookRequest());
+    await expect(inboundHandler(webhookRequest())).rejects.toThrow(
+      'Field photo intake is not configured.'
+    );
 
-    expect(response.status).toBe(503);
     expect(errorLog).toHaveBeenCalledWith(
       'Field photo intake is missing Resend or recipient configuration.'
     );
@@ -322,6 +334,32 @@ describe('Phase: Webhook authentication and admission', () => {
     expect(state.attachmentGet).not.toHaveBeenCalled();
     expect(state.inboxStore.set).not.toHaveBeenCalled();
   });
+
+  it('⚠️ FP-IN-06 ignores verified events that are not inbound email', async () => {
+    state.verify.mockReturnValue({ type: 'email.delivered', data: {} });
+
+    const response = await inboundHandler(webhookRequest());
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, ignored: true });
+    expect(state.getDatabase).not.toHaveBeenCalled();
+    expect(state.receivingGet).not.toHaveBeenCalled();
+    expect(state.processFieldPhoto).not.toHaveBeenCalled();
+    expect(state.inboxStore.set).not.toHaveBeenCalled();
+  });
+
+  it('🔒 FP-IN-07 ignores an event with a malformed sender identity', async () => {
+    state.verify.mockReturnValue(receivedEvent({ from: 'not-an-email-address' }));
+
+    const response = await inboundHandler(webhookRequest());
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, ignored: true });
+    expect(state.getDatabase).not.toHaveBeenCalled();
+    expect(state.receivingGet).not.toHaveBeenCalled();
+    expect(state.processFieldPhoto).not.toHaveBeenCalled();
+    expect(state.inboxStore.set).not.toHaveBeenCalled();
+  });
 });
 
 describe('Phase: Email and attachment acquisition', () => {
@@ -334,8 +372,8 @@ describe('Phase: Email and attachment acquisition', () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true, photos: 0 });
     expect(
-      state.dbCalls.some(
-        (call) => /UPDATE field_photo_submissions SET status = 'no_photos'/.test(call.text)
+      state.dbCalls.some((call) =>
+        /UPDATE field_photo_submissions SET status = 'no_photos'/.test(call.text)
       )
     ).toBe(true);
     expect(state.processFieldPhoto).not.toHaveBeenCalled();
@@ -429,6 +467,160 @@ describe('Phase: Email and attachment acquisition', () => {
       'The attachment is larger than the 15 MB intake limit.'
     );
   });
+
+  it('❌ FP-ACQ-06 fails the invocation when the email record cannot be retrieved', async () => {
+    onDb(/INSERT INTO field_photo_submissions/, [{ id: SUBMISSION_ID, status: 'processing' }]);
+    state.receivingGet.mockResolvedValue({
+      data: null,
+      error: { message: 'Resend email lookup unavailable.' },
+    });
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    await expect(inboundHandler(webhookRequest())).rejects.toThrow(
+      'Resend email lookup unavailable.'
+    );
+
+    expect(
+      state.dbCalls.some(
+        (call) =>
+          /UPDATE field_photo_submissions/.test(call.text) &&
+          call.values.includes('Resend email lookup unavailable.')
+      )
+    ).toBe(true);
+    expect(errorLog).toHaveBeenCalledWith(
+      'Field photo intake failed:',
+      SUBMISSION_ID,
+      'Resend email lookup unavailable.'
+    );
+    expect(JSON.stringify(errorLog.mock.calls)).not.toContain('re_test');
+    expect(state.attachmentGet).not.toHaveBeenCalled();
+    expect(state.processFieldPhoto).not.toHaveBeenCalled();
+    expect(state.inboxStore.set).not.toHaveBeenCalled();
+  });
+
+  it('❌ FP-ACQ-07 isolates attachment-detail lookup failure to that file', async () => {
+    onDb(/INSERT INTO field_photo_submissions/, [{ id: SUBMISSION_ID, status: 'processing' }]);
+    onDb(/INSERT INTO field_photo_submission_files/, [{ id: FILE_ID, status: 'processing' }]);
+    state.attachmentGet.mockResolvedValue({
+      data: null,
+      error: { message: 'Attachment metadata unavailable.' },
+    });
+
+    const response = await inboundHandler(webhookRequest());
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, photos: 0 });
+    expect(failedFileCall()?.values).toContain('Attachment metadata unavailable.');
+    expect(fetch).not.toHaveBeenCalled();
+    expect(state.processFieldPhoto).not.toHaveBeenCalled();
+    expect(state.inboxStore.set).not.toHaveBeenCalled();
+    expect(
+      state.dbCalls.some(
+        (call) =>
+          /INSERT INTO field_photo_submission_events/.test(call.text) &&
+          call.values.includes(JSON.stringify({ attachments: 1, ready: 0, status: 'failed' }))
+      )
+    ).toBe(true);
+  });
+
+  it('🔒 FP-ACQ-08 handles a non-success CDN response without leaking its signed URL', async () => {
+    onDb(/INSERT INTO field_photo_submissions/, [{ id: SUBMISSION_ID, status: 'processing' }]);
+    onDb(/INSERT INTO field_photo_submission_files/, [{ id: FILE_ID, status: 'processing' }]);
+    vi.mocked(fetch).mockResolvedValue(new Response('temporarily unavailable', { status: 503 }));
+
+    const response = await inboundHandler(webhookRequest());
+
+    expect(await response.json()).toEqual({ ok: true, photos: 0 });
+    expect(failedFileCall()?.values).toContain('Attachment download failed (503).');
+    expect(JSON.stringify(state.dbCalls)).not.toContain('signature=test');
+    expect(state.processFieldPhoto).not.toHaveBeenCalled();
+    expect(state.inboxStore.set).not.toHaveBeenCalled();
+    expect(fetch).toHaveBeenCalledWith(expect.any(URL), {
+      redirect: 'error',
+      signal: expect.any(AbortSignal),
+    });
+  });
+
+  it('🔒 FP-ACQ-09 rejects an oversized HTTP content length before reading the body', async () => {
+    onDb(/INSERT INTO field_photo_submissions/, [{ id: SUBMISSION_ID, status: 'processing' }]);
+    onDb(/INSERT INTO field_photo_submission_files/, [{ id: FILE_ID, status: 'processing' }]);
+    const arrayBuffer = vi.fn();
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'Content-Length': String(15 * 1024 * 1024 + 1) }),
+      arrayBuffer,
+    } as unknown as Response);
+
+    const response = await inboundHandler(webhookRequest());
+
+    expect(await response.json()).toEqual({ ok: true, photos: 0 });
+    expect(arrayBuffer).not.toHaveBeenCalled();
+    expect(failedFileCall()?.values).toContain(
+      'The attachment is larger than the 15 MB intake limit.'
+    );
+    expect(state.processFieldPhoto).not.toHaveBeenCalled();
+    expect(state.inboxStore.set).not.toHaveBeenCalled();
+  });
+
+  it('❌ FP-ACQ-10 handles an interrupted response body as a per-file failure', async () => {
+    onDb(/INSERT INTO field_photo_submissions/, [{ id: SUBMISSION_ID, status: 'processing' }]);
+    onDb(/INSERT INTO field_photo_submission_files/, [{ id: FILE_ID, status: 'processing' }]);
+    const arrayBuffer = vi.fn().mockRejectedValue(new Error('connection reset while downloading'));
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'Content-Length': '14' }),
+      arrayBuffer,
+    } as unknown as Response);
+
+    const response = await inboundHandler(webhookRequest());
+
+    expect(await response.json()).toEqual({ ok: true, photos: 0 });
+    expect(arrayBuffer).toHaveBeenCalledTimes(1);
+    expect(failedFileCall()?.values).toContain('connection reset while downloading');
+    expect(JSON.stringify(state.dbCalls)).not.toContain('signature=test');
+    expect(state.processFieldPhoto).not.toHaveBeenCalled();
+    expect(state.inboxStore.set).not.toHaveBeenCalled();
+  });
+
+  it('✅ FP-ACQ-11 accepts the exact attachment-count and aggregate-byte boundaries', async () => {
+    onDb(/INSERT INTO field_photo_submissions/, [{ id: SUBMISSION_ID, status: 'processing' }]);
+    onDb(/INSERT INTO field_photo_submission_files/, [{ id: FILE_ID, status: 'processing' }]);
+    state.receivingGet.mockResolvedValue({
+      data: {
+        attachments: Array.from({ length: 12 }, (_, index) => ({
+          id: `boundary-${index}`,
+          filename: `boundary-${index}.jpg`,
+          size: index < 4 ? 10 * 1024 * 1024 : 0,
+          content_type: 'image/jpeg',
+        })),
+      },
+      error: null,
+    });
+    vi.mocked(fetch).mockImplementation(
+      async () =>
+        new Response(Buffer.from('original-image'), {
+          status: 200,
+          headers: { 'Content-Length': '14', 'Content-Type': 'image/jpeg' },
+        })
+    );
+
+    const response = await inboundHandler(webhookRequest());
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, photos: 12 });
+    expect(state.attachmentGet).toHaveBeenCalledTimes(12);
+    expect(state.processFieldPhoto).toHaveBeenCalledTimes(12);
+    expect(state.inboxStore.set).toHaveBeenCalledTimes(24);
+    expect(
+      state.dbCalls.some(
+        (call) =>
+          /INSERT INTO field_photo_submission_events/.test(call.text) &&
+          call.values.includes(JSON.stringify({ attachments: 12, ready: 12, status: 'ready' }))
+      )
+    ).toBe(true);
+  });
 });
 
 describe('Phase: Image normalization and private storage', () => {
@@ -444,22 +636,21 @@ describe('Phase: Image normalization and private storage', () => {
       },
       error: null,
     });
-    state.processFieldPhoto
-      .mockResolvedValueOnce({
-        image: Buffer.from('sanitized-image'),
-        thumbnail: Buffer.from('thumbnail'),
-        contentType: 'image/jpeg',
-        byteSize: 15,
-        width: 1600,
-        height: 900,
-        sha256: 'a'.repeat(64),
-        capturedAtLocal: null,
-        capturedOffsetMinutes: null,
-        capturedDate: null,
-        gpsLatitude: null,
-        gpsLongitude: null,
-        exifSubset: {},
-      });
+    state.processFieldPhoto.mockResolvedValueOnce({
+      image: Buffer.from('sanitized-image'),
+      thumbnail: Buffer.from('thumbnail'),
+      contentType: 'image/jpeg',
+      byteSize: 15,
+      width: 1600,
+      height: 900,
+      sha256: 'a'.repeat(64),
+      capturedAtLocal: null,
+      capturedOffsetMinutes: null,
+      capturedDate: null,
+      gpsLatitude: null,
+      gpsLongitude: null,
+      exifSubset: {},
+    });
 
     const response = await inboundHandler(webhookRequest());
 
@@ -474,7 +665,9 @@ describe('Phase: Image normalization and private storage', () => {
     ).toBe(true);
     expect(
       state.dbCalls.some(
-        (call) => /UPDATE field_photo_submissions SET status = \$/.test(call.text) && call.values.includes('partial')
+        (call) =>
+          /UPDATE field_photo_submissions SET status = \$/.test(call.text) &&
+          call.values.includes('partial')
       )
     ).toBe(true);
     const processedEvent = state.dbCalls.find((call) =>
@@ -499,7 +692,9 @@ describe('Phase: Image normalization and private storage', () => {
     expect(state.inboxStore.delete).toHaveBeenCalledWith(`${SUBMISSION_ID}/${FILE_ID}/image.jpg`);
     expect(failedFileCall()?.values).toContain('thumbnail storage unavailable');
     expect(
-      state.dbCalls.some((call) => /SET status = \$/.test(call.text) && call.values.includes('failed'))
+      state.dbCalls.some(
+        (call) => /SET status = \$/.test(call.text) && call.values.includes('failed')
+      )
     ).toBe(true);
   });
 
@@ -515,14 +710,80 @@ describe('Phase: Image normalization and private storage', () => {
     expect(state.processFieldPhoto).not.toHaveBeenCalled();
     expect(state.inboxStore.set).not.toHaveBeenCalled();
   });
+
+  it('🔒 FP-PROC-05 enforces sequential attachment processing', async () => {
+    onDb(/INSERT INTO field_photo_submissions/, [{ id: SUBMISSION_ID, status: 'processing' }]);
+    onDb(/INSERT INTO field_photo_submission_files/, [{ id: FILE_ID, status: 'processing' }]);
+    state.receivingGet.mockResolvedValue({
+      data: {
+        attachments: [
+          { id: 'first', filename: 'first.jpg', size: 512, content_type: 'image/jpeg' },
+          { id: 'second', filename: 'second.jpg', size: 512, content_type: 'image/jpeg' },
+        ],
+      },
+      error: null,
+    });
+    vi.mocked(fetch).mockImplementation(
+      async () =>
+        new Response(Buffer.from('original-image'), {
+          status: 200,
+          headers: { 'Content-Length': '14', 'Content-Type': 'image/jpeg' },
+        })
+    );
+    let activeProcessors = 0;
+    let maxActiveProcessors = 0;
+    state.processFieldPhoto.mockImplementation(async () => {
+      activeProcessors += 1;
+      maxActiveProcessors = Math.max(maxActiveProcessors, activeProcessors);
+      await new Promise<void>((resolve) => queueMicrotask(resolve));
+      activeProcessors -= 1;
+      return {
+        image: Buffer.from('sanitized-image'),
+        thumbnail: Buffer.from('thumbnail'),
+        contentType: 'image/jpeg',
+        byteSize: 15,
+        width: 1600,
+        height: 900,
+        sha256: 'a'.repeat(64),
+        capturedAtLocal: null,
+        capturedOffsetMinutes: null,
+        capturedDate: null,
+        gpsLatitude: null,
+        gpsLongitude: null,
+        exifSubset: {},
+      };
+    });
+
+    const response = await inboundHandler(webhookRequest());
+
+    expect(await response.json()).toEqual({ ok: true, photos: 2 });
+    expect(state.processFieldPhoto).toHaveBeenCalledTimes(2);
+    expect(maxActiveProcessors).toBe(1);
+  });
+
+  it('❌ FP-PROC-06 fails safely when the first private Blob write fails', async () => {
+    onDb(/INSERT INTO field_photo_submissions/, [{ id: SUBMISSION_ID, status: 'processing' }]);
+    onDb(/INSERT INTO field_photo_submission_files/, [{ id: FILE_ID, status: 'processing' }]);
+    state.inboxStore.set.mockRejectedValueOnce(new Error('private storage unavailable'));
+
+    const response = await inboundHandler(webhookRequest());
+
+    expect(await response.json()).toEqual({ ok: true, photos: 0 });
+    expect(state.inboxStore.set).toHaveBeenCalledTimes(1);
+    expect(state.inboxStore.delete).not.toHaveBeenCalled();
+    expect(failedFileCall()?.values).toContain('private storage unavailable');
+    expect(
+      state.dbCalls.some((call) =>
+        /UPDATE field_photo_submission_files SET content_type/.test(call.text)
+      )
+    ).toBe(false);
+  });
 });
 
 describe('Phase: Coordinator private inbox and previews', () => {
   it('🔒 FP-ADM-01 rejects malformed preview identifiers before storage access', async () => {
     const response = await adminInboxHandler(
-      new Request(
-        'https://whofixedtheroof.com/api/admin/field-photo-inbox?file_id=../../secret'
-      )
+      new Request('https://whofixedtheroof.com/api/admin/field-photo-inbox?file_id=../../secret')
     );
 
     expect(response.status).toBe(404);
@@ -601,21 +862,36 @@ describe('Phase: Approval and publication', () => {
     const response = await adminInboxHandler(adminRequest('POST', approvalBody()));
 
     expect(response.status).toBe(409);
-    expect(await response.json()).toEqual({ error: 'One or more selected photos are unavailable.' });
+    expect(await response.json()).toEqual({
+      error: 'One or more selected photos are unavailable.',
+    });
     expect(state.inboxStore.get).not.toHaveBeenCalled();
     expect(state.finalStore.set).not.toHaveBeenCalled();
   });
 
-  it('❌ FP-ADM-07 rejects approval when the private derivative is missing', async () => {
-    configureApproval();
+  it('❌ FP-ADM-07 keeps a missing private derivative available to retry', async () => {
+    configureApproval('draft', [readyInboxFile()], 1, 0);
     state.inboxStore.get.mockResolvedValue(null);
 
     const response = await adminInboxHandler(adminRequest('POST', approvalBody()));
+    const body = await response.json();
 
-    expect(response.status).toBe(409);
-    expect(await response.json()).toEqual({ error: 'A selected photo is no longer available.' });
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      ok: false,
+      approved: [],
+      failures: [
+        {
+          file_id: FILE_ID,
+          error: 'This photo could not be approved. It remains in the inbox to retry.',
+        },
+      ],
+      status: 'ready',
+    });
     expect(state.finalStore.set).not.toHaveBeenCalled();
-    expect(state.dbCalls.some((call) => /INSERT INTO field_note_photos/.test(call.text))).toBe(false);
+    expect(state.dbCalls.some((call) => /INSERT INTO field_note_photos/.test(call.text))).toBe(
+      false
+    );
   });
 
   it('❌ FP-ADM-08 removes a copied public Blob when its database insert fails', async () => {
@@ -626,10 +902,16 @@ describe('Phase: Approval and publication', () => {
       .mockRejectedValueOnce(new Error('database insert failed'));
     state.inboxStore.get.mockResolvedValue(Buffer.from('sanitized-image').buffer);
 
-    await expect(
-      adminInboxHandler(adminRequest('POST', approvalBody()))
-    ).rejects.toThrow('database insert failed');
+    const response = await adminInboxHandler(adminRequest('POST', approvalBody()));
+    const body = await response.json();
 
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      ok: false,
+      approved: [],
+      failures: [{ file_id: FILE_ID }],
+      status: 'ready',
+    });
     const publicKey = state.finalStore.set.mock.calls[0]?.[0];
     expect(publicKey).toEqual(expect.stringMatching(new RegExp(`^${NOTE_ID}/[0-9a-f-]+$`)));
     expect(state.finalStore.delete).toHaveBeenCalledWith(publicKey);
@@ -646,7 +928,9 @@ describe('Phase: Approval and publication', () => {
     expect((await response.json()).approved).toHaveLength(1);
     expect(state.inboxStore.delete).toHaveBeenCalledTimes(2);
     expect(
-      state.dbCalls.some((call) => /SET inbox_blob_key = NULL, thumbnail_blob_key = NULL/.test(call.text))
+      state.dbCalls.some((call) =>
+        /SET inbox_blob_key = NULL, thumbnail_blob_key = NULL/.test(call.text)
+      )
     ).toBe(false);
     expect(
       state.dbCalls.some(
@@ -664,9 +948,7 @@ describe('Phase: Approval and publication', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(state.inboxStore.delete).toHaveBeenCalledWith(
-      `${SUBMISSION_ID}/${FILE_ID}/image.jpg`
-    );
+    expect(state.inboxStore.delete).toHaveBeenCalledWith(`${SUBMISSION_ID}/${FILE_ID}/image.jpg`);
     expect(state.inboxStore.delete).toHaveBeenCalledWith(
       `${SUBMISSION_ID}/${FILE_ID}/thumbnail.jpg`
     );
@@ -692,6 +974,26 @@ describe('Phase: Approval and publication', () => {
       method: 'POST',
     });
   });
+
+  it('❌ FP-ADM-12 validates the entire approval metadata selection before any lookup or copy', async () => {
+    const response = await adminInboxHandler(
+      adminRequest(
+        'POST',
+        approvalBody([
+          { id: FILE_ID, captured_date: '2026-08-24' },
+          { id: '77777777-7777-4777-8777-777777777777', captured_date: '2026-02-31' },
+        ])
+      )
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: 'A selected photo has an invalid capture date.',
+    });
+    expect(state.sql).not.toHaveBeenCalled();
+    expect(state.inboxStore.get).not.toHaveBeenCalled();
+    expect(state.finalStore.set).not.toHaveBeenCalled();
+  });
 });
 
 describe('Phase: Cross-cutting replay and concurrency guards', () => {
@@ -706,5 +1008,34 @@ describe('Phase: Cross-cutting replay and concurrency guards', () => {
     expect(response.status).toBe(409);
     expect(state.inboxStore.get).not.toHaveBeenCalled();
     expect(state.finalStore.set).not.toHaveBeenCalled();
+  });
+
+  it('⚠️ FP-X-02 compensates when a concurrent approval wins the ready-row claim', async () => {
+    onDb(/SELECT id, status FROM field_notes/, [{ id: NOTE_ID, status: 'draft' }]);
+    onDb(/SELECT \* FROM field_photo_submission_files/, [readyInboxFile()]);
+    onDb(/SELECT COALESCE\(MAX\(sort_order\)/, [{ max_order: -1 }]);
+    onDb(/SELECT id FROM approved_file/, []);
+    onDb(/COUNT\(\*\) FILTER \(WHERE status = 'ready'\)/, [{ ready_count: 1, approved_count: 0 }]);
+    state.inboxStore.get.mockResolvedValue(Buffer.from('sanitized-image').buffer);
+
+    const response = await adminInboxHandler(adminRequest('POST', approvalBody()));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      ok: false,
+      approved: [],
+      failures: [{ file_id: FILE_ID }],
+      status: 'ready',
+    });
+    const publicKey = state.finalStore.set.mock.calls[0]?.[0];
+    expect(publicKey).toEqual(expect.stringMatching(new RegExp(`^${NOTE_ID}/[0-9a-f-]+$`)));
+    expect(state.finalStore.delete).toHaveBeenCalledWith(publicKey);
+    expect(state.dbCalls.some((call) => /UPDATE field_photo_submissions SET/.test(call.text))).toBe(
+      false
+    );
+    expect(
+      state.dbCalls.some((call) => /INSERT INTO field_photo_submission_events/.test(call.text))
+    ).toBe(false);
   });
 });

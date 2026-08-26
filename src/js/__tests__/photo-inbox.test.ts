@@ -157,8 +157,7 @@ async function boot() {
 
 function writeRequests(method: string) {
   return fetchLog.filter(
-    (request) =>
-      request.url.startsWith('/api/admin/field-photo-inbox') && request.method === method
+    (request) => request.url.startsWith('/api/admin/field-photo-inbox') && request.method === method
   );
 }
 
@@ -209,8 +208,7 @@ describe('coordinator Photo Inbox integration', () => {
     const firstFile = card.querySelector<HTMLElement>(`[data-file-id="${FILE_IDS[0]}"]`)!;
     firstFile.querySelector<HTMLInputElement>('[data-field="alt"]')!.value =
       'Volunteers repairing the roof';
-    firstFile.querySelector<HTMLInputElement>('[data-field="captured-date"]')!.value =
-      '2026-08-25';
+    firstFile.querySelector<HTMLInputElement>('[data-field="captured-date"]')!.value = '2026-08-25';
     firstFile.querySelector<HTMLInputElement>('[data-field="location"]')!.value = 'Augusta, GA';
 
     card.querySelector<HTMLButtonElement>('[data-action="save"]')!.click();
@@ -242,9 +240,7 @@ describe('coordinator Photo Inbox integration', () => {
     card.querySelector<HTMLButtonElement>('[data-action="approve"]')!.click();
     await flush();
 
-    const approve = writeRequests('POST').find(
-      (request) => request.body?.action === 'approve'
-    );
+    const approve = writeRequests('POST').find((request) => request.body?.action === 'approve');
     expect(approve?.body).toEqual({
       action: 'approve',
       submission_id: SUBMISSION_ID,
@@ -266,5 +262,33 @@ describe('coordinator Photo Inbox integration', () => {
 
     const reject = writeRequests('POST').find((request) => request.body?.action === 'reject');
     expect(reject?.body).toEqual({ action: 'reject', submission_id: SUBMISSION_ID });
+  });
+
+  it('reports partial approval while leaving failed photos available to retry', async () => {
+    await boot();
+    mockFetch.mockImplementationOnce(async () =>
+      jsonResponse({
+        ok: false,
+        approved: [{ file_id: FILE_IDS[0], photo_id: 'photo-id' }],
+        failures: [
+          {
+            file_id: FILE_IDS[1],
+            error: 'This photo could not be approved. It remains in the inbox to retry.',
+          },
+        ],
+        status: 'partial',
+      })
+    );
+    const card = document.querySelector<HTMLElement>('.photo-inbox-card')!;
+    card.querySelector<HTMLSelectElement>('[data-field="note"]')!.value = NOTE_ID;
+    const fileCards = Array.from(card.querySelectorAll<HTMLElement>('[data-file-id]'));
+    fileCards[2].querySelector<HTMLInputElement>('[data-field="selected"]')!.checked = false;
+
+    card.querySelector<HTMLButtonElement>('[data-action="approve"]')!.click();
+    await flush();
+
+    expect(document.querySelector('.toast')?.textContent).toBe(
+      '1 photo approved; 1 remain in the inbox to retry.'
+    );
   });
 });
