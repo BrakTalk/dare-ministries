@@ -1,9 +1,10 @@
 import { createHash } from 'node:crypto';
 import { access, readFile } from 'node:fs/promises';
 import { constants } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const projectRoot = resolve(import.meta.dirname, '..');
+const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const manifestPath = resolve(projectRoot, 'netlify/functions/vendor/heic-decoder/manifest.json');
 const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
 
