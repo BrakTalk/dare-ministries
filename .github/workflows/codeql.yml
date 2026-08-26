@@ -21,6 +21,8 @@ jobs:
         language: [javascript-typescript, c-cpp]
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4.37.8
         with:
