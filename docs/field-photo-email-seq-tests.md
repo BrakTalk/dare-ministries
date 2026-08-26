@@ -286,7 +286,7 @@ External side effects are Resend API calls, CDN downloads, database writes, priv
 
 # Cross-cutting security, resilience, and concurrency tests
 
-### FP-X-01 - Reject duplicate file IDs in one approval selection
+## FP-X-01 - Reject duplicate file IDs in one approval selection
 - Category: Replay and selection integrity
 - Priority: P1
 - Type: Edge / Concurrency
