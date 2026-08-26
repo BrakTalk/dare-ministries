@@ -4,14 +4,20 @@
   "description": "D.A.R.E. Ministries — Disaster Aid Recovery and Effort",
   "scripts": {
     "build": "npx @11ty/eleventy",
+    "build:heic-decoder": "bash scripts/build-heic-decoder.sh",
     "dev": "npx @11ty/eleventy --serve",
     "test": "vitest run && npm run test:portal",
+    "test:heic-decoder": "vitest run netlify/functions/__tests__/heic-decoder.test.ts netlify/functions/__tests__/field-photo-heic-integration.test.ts",
+    "verify:heic-artifacts": "node scripts/verify-heic-artifacts.mjs",
     "test:portal": "node --test test/*.test.mjs"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
+  "engines": {
+    "node": ">=20"
+  },
   "devDependencies": {
     "@11ty/eleventy": "^3.1.2",
     "@netlify/database-dev": "^0.10.1",

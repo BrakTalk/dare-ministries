@@ -1,0 +1,37 @@
+{
+  "platform": "linux-x86_64-amazonlinux2023",
+  "purpose": "decode-only HEVC-backed HEIC/HEIF intake",
+  "libheif": {
+    "version": "1.23.1",
+    "commit": "2c4bbb54c2738d4a5efbbe3e5fa1d5d76bb88eb0",
+    "license": "LGPL-3.0-or-later"
+  },
+  "libde265": {
+    "version": "1.1.1",
+    "commit": "4dd701fffac01632ffd5cabc5ef10deb56accba1",
+    "license": "LGPL-3.0-or-later"
+  },
+  "capabilities": {
+    "hevcDecode": true,
+    "heicEncode": false,
+    "pluginLoading": false,
+    "otherCodecs": false
+  },
+  "artifacts": [
+    {
+      "path": "bin/heic-intake-decoder",
+      "sha256": "1cda93e5aa48b35907969555edae72dcfd92adab425e9e95cca883697b68ca33",
+      "elf": true
+    },
+    {
+      "path": "lib/libheif.so.1",
+      "sha256": "2e5afddedca14d65e845696eb6e70e8d2ec75dcbfd6a1f81c0a700f8b7b7fa2a",
+      "elf": true
+    },
+    {
+      "path": "lib/libde265.so.0",
+      "sha256": "c6e4aa3a80090e3ff81864453d365cc7cb75a2315251a248ec1bec7275a17f67",
+      "elf": true
+    }
+  ]
+}

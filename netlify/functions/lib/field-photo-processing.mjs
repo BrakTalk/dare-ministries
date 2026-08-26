@@ -1,12 +1,25 @@
 import { createHash } from 'node:crypto';
 import exifr from 'exifr';
 import sharp from 'sharp';
+import { decodeHeic, heicIntakeEnabled } from './heic-decoder.mjs';
 
 export const INBOX_IMAGE_CONTENT_TYPE = 'image/jpeg';
 export const MAX_INBOX_IMAGE_BYTES = 15 * 1024 * 1024;
 export const MAX_INBOX_IMAGE_PIXELS = 40_000_000;
 
 const SUPPORTED_INPUT_FORMATS = new Set(['jpeg', 'png', 'webp', 'avif']);
+const MIME_TYPES_BY_FORMAT = new Map([
+  ['jpeg', new Set(['image/jpeg'])],
+  ['png', new Set(['image/png'])],
+  ['webp', new Set(['image/webp'])],
+  ['avif', new Set(['image/avif'])],
+  ['heic', new Set(['image/heic', 'image/heif'])],
+  ['heif', new Set(['image/heic', 'image/heif'])],
+]);
+const HEIF_STILL_BRANDS = new Set(['heic', 'heix']);
+const HEIF_GENERIC_BRANDS = new Set(['mif1', 'mif2', 'mif3', 'miaf', '1pic']);
+const HEIF_SEQUENCE_BRANDS = new Set(['hevc', 'hevx', 'hevm', 'hevs', 'msf1', 'avis']);
+const HEIF_LAYERED_BRANDS = new Set(['heim', 'heis', 'hevm', 'hevs']);
 
 function validCalendarParts(year, month, day, hour, minute, second) {
   const value = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
@@ -91,7 +104,13 @@ export function normalizeExifMetadata(tags = {}, gps = null) {
 async function extractExif(buffer) {
   const [tagResult, gpsResult] = await Promise.allSettled([
     exifr.parse(buffer, {
-      pick: ['DateTimeOriginal', 'DateTimeDigitized', 'OffsetTimeOriginal', 'OffsetTime'],
+      pick: [
+        'DateTimeOriginal',
+        'DateTimeDigitized',
+        'OffsetTimeOriginal',
+        'OffsetTime',
+        'Orientation',
+      ],
       translateKeys: true,
       translateValues: false,
       reviveValues: false,
@@ -101,27 +120,130 @@ async function extractExif(buffer) {
     exifr.gps(buffer),
   ]);
 
-  return normalizeExifMetadata(
-    tagResult.status === 'fulfilled' && tagResult.value ? tagResult.value : {},
+  const tags = tagResult.status === 'fulfilled' && tagResult.value ? tagResult.value : {};
+  const normalized = normalizeExifMetadata(
+    tags,
     gpsResult.status === 'fulfilled' ? gpsResult.value : null
   );
+  const orientation = Number(tags.Orientation);
+  const sourceOrientation =
+    Number.isInteger(orientation) && orientation >= 1 && orientation <= 8 ? orientation : null;
+  return {
+    ...normalized,
+    sourceOrientation,
+    exifSubset: {
+      ...normalized.exifSubset,
+      ...(sourceOrientation ? { source_orientation: sourceOrientation } : {}),
+    },
+  };
 }
 
-export async function processFieldPhoto(input) {
+function fourCharacterCode(buffer, offset) {
+  return buffer.toString('ascii', offset, offset + 4);
+}
+
+function inspectIsoBaseMedia(buffer) {
+  if (buffer.length < 16 || fourCharacterCode(buffer, 4) !== 'ftyp') return null;
+  const boxSize = buffer.readUInt32BE(0);
+  if (boxSize < 16 || boxSize > buffer.length || (boxSize - 16) % 4 !== 0) return null;
+  const brands = new Set([fourCharacterCode(buffer, 8)]);
+  for (let offset = 16; offset < boxSize; offset += 4) {
+    brands.add(fourCharacterCode(buffer, offset));
+  }
+  return brands;
+}
+
+function intersects(brands, candidates) {
+  return [...candidates].some((brand) => brands.has(brand));
+}
+
+export function detectFieldPhotoFormat(input) {
+  const buffer = Buffer.isBuffer(input) ? input : Buffer.from(input);
+  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+    return 'jpeg';
+  }
+  if (
+    buffer.length >= 8 &&
+    buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+  ) {
+    return 'png';
+  }
+  if (
+    buffer.length >= 12 &&
+    fourCharacterCode(buffer, 0) === 'RIFF' &&
+    fourCharacterCode(buffer, 8) === 'WEBP'
+  ) {
+    return 'webp';
+  }
+
+  const brands = inspectIsoBaseMedia(buffer);
+  if (!brands) return null;
+  if (intersects(brands, HEIF_LAYERED_BRANDS)) return 'heif-layered';
+  if (intersects(brands, HEIF_SEQUENCE_BRANDS)) return 'heif-sequence';
+  if (brands.has('avif')) return 'avif';
+  if (intersects(brands, HEIF_STILL_BRANDS)) return 'heic';
+  if (intersects(brands, HEIF_GENERIC_BRANDS)) return 'heif';
+  return null;
+}
+
+function assertDeclaredTypeMatches(format, declaredType) {
+  if (!declaredType) return;
+  if (!MIME_TYPES_BY_FORMAT.get(format)?.has(declaredType)) {
+    throw new Error('The attachment contents do not match its declared photo type.');
+  }
+}
+
+export async function processFieldPhoto(input, options = {}) {
   const buffer = Buffer.isBuffer(input) ? input : Buffer.from(input);
   if (!buffer.length) throw new Error('The image is empty.');
   if (buffer.length > MAX_INBOX_IMAGE_BYTES) {
     throw new Error('The image is larger than the 15 MB intake limit.');
   }
 
-  const image = sharp(buffer, {
-    animated: false,
-    failOn: 'warning',
-    limitInputPixels: MAX_INBOX_IMAGE_PIXELS,
-  });
-  const metadata = await image.metadata();
-  if (!SUPPORTED_INPUT_FORMATS.has(metadata.format)) {
-    throw new Error('Only JPEG, PNG, WebP, and AVIF photos are supported.');
+  const format = detectFieldPhotoFormat(buffer);
+  if (format === 'heif-sequence') {
+    throw new Error('Timed HEIF sequences and videos are not supported.');
+  }
+  if (format === 'heif-layered') {
+    throw new Error('Layered HEIF formats are not supported.');
+  }
+  if (!format || (!SUPPORTED_INPUT_FORMATS.has(format) && format !== 'heic' && format !== 'heif')) {
+    throw new Error('Only JPEG, PNG, WebP, AVIF, HEIC, and HEIF photos are supported.');
+  }
+  const declaredType = String(options.declaredType || '')
+    .trim()
+    .toLowerCase();
+  assertDeclaredTypeMatches(format, declaredType);
+
+  let image;
+  let metadata;
+  let exifSource = buffer;
+  let autoOrient = true;
+  if (format === 'heic' || format === 'heif') {
+    if (!heicIntakeEnabled(options.heicEnabled)) {
+      throw new Error('HEIC photo intake is not enabled.');
+    }
+    const decoded = await decodeHeic(buffer, options.decoderOptions);
+    image = sharp(decoded.pixels, {
+      raw: { width: decoded.width, height: decoded.height, channels: decoded.channels },
+      failOn: 'warning',
+      limitInputPixels: MAX_INBOX_IMAGE_PIXELS,
+    });
+    metadata = { format, width: decoded.width, height: decoded.height, pages: 1 };
+    exifSource = decoded.exif;
+    autoOrient = false;
+  } else {
+    image = sharp(buffer, {
+      animated: false,
+      failOn: 'warning',
+      limitInputPixels: MAX_INBOX_IMAGE_PIXELS,
+    });
+    metadata = await image.metadata();
+    const decodedFormatMatches =
+      metadata.format === format || (format === 'avif' && metadata.format === 'heif');
+    if (!decodedFormatMatches) {
+      throw new Error('The attachment signature does not match the decoded photo format.');
+    }
   }
   if (!metadata.width || !metadata.height)
     throw new Error('The image dimensions could not be read.');
@@ -131,9 +253,9 @@ export async function processFieldPhoto(input) {
     throw new Error('The image dimensions are too large to process safely.');
   }
 
-  const exif = await extractExif(buffer);
-  const rendered = await image
-    .rotate()
+  const exif = await extractExif(exifSource);
+  const orientedImage = autoOrient ? image.rotate() : image;
+  const rendered = await orientedImage
     .resize({ width: 2000, height: 2000, fit: 'inside', withoutEnlargement: true })
     .jpeg({ quality: 85, progressive: true })
     .toBuffer({ resolveWithObject: true });

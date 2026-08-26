@@ -185,17 +185,19 @@ beforeEach(() => {
   }
   vi.stubGlobal(
     'fetch',
-    vi.fn().mockResolvedValue(
-      new Response(Buffer.from('original-image'), {
-        status: 200,
-        headers: { 'Content-Length': '14', 'Content-Type': 'image/jpeg' },
-      })
+    vi.fn().mockImplementation(
+      async () =>
+        new Response(Buffer.from('original-image'), {
+          status: 200,
+          headers: { 'Content-Length': '14', 'Content-Type': 'image/jpeg' },
+        })
     )
   );
   process.env.RESEND_API_KEY = 're_test';
   process.env.RESEND_WEBHOOK_SECRET = 'whsec_test';
   process.env.FIELD_PHOTO_INBOX_RECIPIENTS = 'photos@inbound.example';
   delete process.env.FIELD_PHOTO_ALLOWED_SENDERS;
+  delete process.env.FIELD_PHOTO_HEIC_ENABLED;
   delete process.env.BUILD_HOOK_URL;
 });
 
@@ -230,7 +232,9 @@ describe('Resend field photo ingestion', () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true, photos: 1 });
-    expect(state.processFieldPhoto).toHaveBeenCalledWith(Buffer.from('original-image'));
+    expect(state.processFieldPhoto).toHaveBeenCalledWith(Buffer.from('original-image'), {
+      declaredType: 'image/jpeg',
+    });
     expect(state.inboxStore.set).toHaveBeenNthCalledWith(
       1,
       `${SUBMISSION_ID}/${FILE_ID}/image.jpg`,
@@ -251,8 +255,9 @@ describe('Resend field photo ingestion', () => {
     expect(metadataUpdate?.values).toContain(-82.0105);
   });
 
-  it('records HEIC attachments as unsupported without downloading them', async () => {
+  it('processes a declared HEIC attachment into the same private quarantine', async () => {
     onDb(/INSERT INTO field_photo_submissions/, [{ id: SUBMISSION_ID, status: 'processing' }]);
+    onDb(/INSERT INTO field_photo_submission_files/, [{ id: FILE_ID, status: 'processing' }]);
     state.receivingGet.mockResolvedValue({
       data: {
         attachments: [
@@ -266,18 +271,84 @@ describe('Resend field photo ingestion', () => {
       },
       error: null,
     });
+    state.attachmentGet.mockResolvedValue({
+      data: {
+        id: ATTACHMENT_ID,
+        size: 2048,
+        content_type: 'image/heic',
+        download_url: `https://inbound-cdn.resend.com/${EMAIL_ID}/attachments/${ATTACHMENT_ID}?signature=test`,
+      },
+      error: null,
+    });
 
     const response = await inboundHandler(webhookRequest());
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ ok: true, photos: 0 });
-    expect(state.attachmentGet).not.toHaveBeenCalled();
-    expect(state.processFieldPhoto).not.toHaveBeenCalled();
-    const failedFileInsert = state.dbCalls.find((call) =>
-      /INSERT INTO field_photo_submission_files/.test(call.text)
-    );
-    expect(failedFileInsert?.values).toContain('image/heic');
-    expect(failedFileInsert?.values).toContain('The attachment is not a supported photo type.');
+    expect(await response.json()).toEqual({ ok: true, photos: 1 });
+    expect(state.processFieldPhoto).toHaveBeenCalledWith(Buffer.from('original-image'), {
+      declaredType: 'image/heic',
+    });
+    expect(state.inboxStore.set).toHaveBeenCalledTimes(2);
+  });
+
+  it('continues sequentially after one attachment fails', async () => {
+    onDb(/INSERT INTO field_photo_submissions/, [{ id: SUBMISSION_ID, status: 'processing' }]);
+    onDb(/INSERT INTO field_photo_submission_files/, [{ id: FILE_ID, status: 'processing' }]);
+    state.receivingGet.mockResolvedValue({
+      data: {
+        attachments: [
+          { id: ATTACHMENT_ID, filename: 'bad.heic', size: 512, content_type: 'image/heic' },
+          { id: 'second-attachment', filename: 'good.jpg', size: 512, content_type: 'image/jpeg' },
+        ],
+      },
+      error: null,
+    });
+    state.attachmentGet
+      .mockResolvedValueOnce({
+        data: {
+          id: ATTACHMENT_ID,
+          size: 512,
+          content_type: 'image/heic',
+          download_url: `https://inbound-cdn.resend.com/${EMAIL_ID}/attachments/${ATTACHMENT_ID}?signature=test`,
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: {
+          id: 'second-attachment',
+          size: 512,
+          content_type: 'image/jpeg',
+          download_url: `https://inbound-cdn.resend.com/${EMAIL_ID}/attachments/second-attachment?signature=test`,
+        },
+        error: null,
+      });
+    state.processFieldPhoto
+      .mockRejectedValueOnce(new Error('The HEIC photo could not be decoded safely.'))
+      .mockResolvedValueOnce({
+        image: Buffer.from('sanitized-image'),
+        thumbnail: Buffer.from('thumbnail'),
+        contentType: 'image/jpeg',
+        byteSize: 15,
+        width: 1600,
+        height: 900,
+        sha256: 'a'.repeat(64),
+        capturedAtLocal: null,
+        capturedOffsetMinutes: null,
+        capturedDate: null,
+        gpsLatitude: null,
+        gpsLongitude: null,
+        exifSubset: {},
+      });
+
+    const response = await inboundHandler(webhookRequest());
+
+    expect(await response.json()).toEqual({ ok: true, photos: 1 });
+    expect(state.processFieldPhoto).toHaveBeenNthCalledWith(1, Buffer.from('original-image'), {
+      declaredType: 'image/heic',
+    });
+    expect(state.processFieldPhoto).toHaveBeenNthCalledWith(2, Buffer.from('original-image'), {
+      declaredType: 'image/jpeg',
+    });
   });
 });
 

@@ -8,7 +8,11 @@ import { Resend } from 'resend';
 import { FIELD_PHOTO_INBOX_STORE, cleanText, json } from './lib/helpers.mjs';
 import { MAX_INBOX_IMAGE_BYTES, processFieldPhoto } from './lib/field-photo-processing.mjs';
 
-export const config = { path: '/api/inbound/field-photos', background: true };
+export const config = {
+  path: '/api/inbound/field-photos',
+  background: true,
+  includedFiles: ['./vendor/heic-decoder/**'],
+};
 
 const MAX_ATTACHMENTS = 12;
 const MAX_TOTAL_BYTES = 40 * 1024 * 1024;
@@ -18,6 +22,8 @@ const ALLOWED_DECLARED_TYPES = new Set([
   'image/png',
   'image/webp',
   'image/avif',
+  'image/heic',
+  'image/heif',
 ]);
 
 function emailAddress(value) {
@@ -187,7 +193,7 @@ async function processAttachment({ db, resend, store, submissionId, emailId, att
     }
     const details = attachmentResponse.data;
     const buffer = await downloadAttachment(details.download_url, Number(details.size || 0));
-    const processed = await processFieldPhoto(buffer);
+    const processed = await processFieldPhoto(buffer, { declaredType });
     const imageKey = `${submissionId}/${file.id}/image.jpg`;
     const thumbnailKey = `${submissionId}/${file.id}/thumbnail.jpg`;
 
