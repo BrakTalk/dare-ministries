@@ -17,6 +17,7 @@ export const config = {
 const MAX_ATTACHMENTS = 12;
 const MAX_TOTAL_BYTES = 40 * 1024 * 1024;
 const DOWNLOAD_TIMEOUT_MS = 20_000;
+const RESEND_ATTACHMENT_HOST = 'inbound-cdn.resend.com';
 const ALLOWED_DECLARED_TYPES = new Set([
   'image/jpeg',
   'image/png',
@@ -75,7 +76,13 @@ async function downloadAttachment(url, expectedBytes) {
   } catch {
     throw new Error('Resend returned an invalid attachment URL.');
   }
-  if (parsed.protocol !== 'https:' || parsed.hostname !== 'inbound-cdn.resend.com') {
+  if (parsed.protocol !== 'https:' || parsed.hostname !== RESEND_ATTACHMENT_HOST) {
+    // Log only the parsed hostname. The complete signed URL contains temporary
+    // credentials and must never be written to function logs.
+    console.error(
+      'Field photo intake rejected unexpected Resend attachment hostname:',
+      parsed.hostname
+    );
     throw new Error('Resend returned an unexpected attachment host.');
   }
   if (expectedBytes > MAX_INBOX_IMAGE_BYTES) {

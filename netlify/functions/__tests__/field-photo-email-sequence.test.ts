@@ -429,11 +429,12 @@ describe('Phase: Email and attachment acquisition', () => {
   it('🔒 FP-ACQ-04 refuses attachment downloads from an unexpected host', async () => {
     onDb(/INSERT INTO field_photo_submissions/, [{ id: SUBMISSION_ID, status: 'processing' }]);
     onDb(/INSERT INTO field_photo_submission_files/, [{ id: FILE_ID, status: 'processing' }]);
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     state.attachmentGet.mockResolvedValue({
       data: {
         id: ATTACHMENT_ID,
         size: 2048,
-        download_url: 'https://attacker.example/roof.jpg',
+        download_url: 'https://attacker.example/roof.jpg?signature=must-not-be-logged',
       },
       error: null,
     });
@@ -444,6 +445,11 @@ describe('Phase: Email and attachment acquisition', () => {
     expect(fetch).not.toHaveBeenCalled();
     expect(state.processFieldPhoto).not.toHaveBeenCalled();
     expect(failedFileCall()?.values).toContain('Resend returned an unexpected attachment host.');
+    expect(errorLog).toHaveBeenCalledWith(
+      'Field photo intake rejected unexpected Resend attachment hostname:',
+      'attacker.example'
+    );
+    expect(JSON.stringify(errorLog.mock.calls)).not.toContain('must-not-be-logged');
   });
 
   it('🔒 FP-ACQ-05 rejects an oversized attachment before download', async () => {
