@@ -452,6 +452,27 @@ describe('Phase: Email and attachment acquisition', () => {
     expect(JSON.stringify(errorLog.mock.calls)).not.toContain('must-not-be-logged');
   });
 
+  it('✅ FP-ACQ-04A accepts Resend attachment downloads from cdn.resend.app', async () => {
+    onDb(/INSERT INTO field_photo_submissions/, [{ id: SUBMISSION_ID, status: 'processing' }]);
+    onDb(/INSERT INTO field_photo_submission_files/, [{ id: FILE_ID, status: 'processing' }]);
+    state.attachmentGet.mockResolvedValue({
+      data: {
+        id: ATTACHMENT_ID,
+        size: 2048,
+        download_url: `https://cdn.resend.app/${EMAIL_ID}/attachments/${ATTACHMENT_ID}?signature=test`,
+      },
+      error: null,
+    });
+
+    const response = await inboundHandler(webhookRequest());
+
+    expect(await response.json()).toEqual({ ok: true, photos: 1 });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(state.processFieldPhoto).toHaveBeenCalledWith(Buffer.from('original-image'), {
+      declaredType: 'image/jpeg',
+    });
+  });
+
   it('🔒 FP-ACQ-05 rejects an oversized attachment before download', async () => {
     onDb(/INSERT INTO field_photo_submissions/, [{ id: SUBMISSION_ID, status: 'processing' }]);
     onDb(/INSERT INTO field_photo_submission_files/, [{ id: FILE_ID, status: 'processing' }]);
