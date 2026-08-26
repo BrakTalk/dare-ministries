@@ -468,7 +468,8 @@ describe('Coordinator Photo Inbox', () => {
       },
     ]);
     onDb(/SELECT COALESCE\(MAX\(sort_order\)/, [{ max_order: -1 }]);
-    onDb(/SELECT COUNT\(\*\)::INTEGER AS count/, [{ count: 0 }]);
+    onDb(/SELECT id FROM approved_file/, [{ id: FILE_ID }]);
+    onDb(/COUNT\(\*\) FILTER \(WHERE status = 'ready'\)/, [{ ready_count: 0, approved_count: 1 }]);
     state.inboxStore.get.mockResolvedValue(Buffer.from('sanitized-image').buffer);
 
     const response = await adminInboxHandler(
@@ -500,10 +501,82 @@ describe('Coordinator Photo Inbox', () => {
       /INSERT INTO field_note_photos/.test(call.text)
     );
     expect(publicPhotoInsert).toBeDefined();
-    expect(publicPhotoInsert?.text).not.toContain('gps_latitude');
-    expect(publicPhotoInsert?.text).not.toContain('gps_longitude');
+    const insertedPhotoSql = publicPhotoInsert?.text.split('approved_file AS')[0];
+    expect(insertedPhotoSql).not.toContain('gps_latitude');
+    expect(insertedPhotoSql).not.toContain('gps_longitude');
     expect(state.dbCalls.some((call) => /SET is_cover = \(id = \$\)/.test(call.text))).toBe(true);
     expect(state.requireSameOrigin).toHaveBeenCalled();
+  });
+
+  it('keeps later approval failures retryable and reports partial success', async () => {
+    onDb(/SELECT id, status FROM field_notes/, [{ id: NOTE_ID, status: 'draft' }]);
+    onDb(/SELECT \* FROM field_photo_submission_files/, [
+      {
+        id: FILE_ID,
+        submission_id: SUBMISSION_ID,
+        status: 'ready',
+        inbox_blob_key: `${SUBMISSION_ID}/${FILE_ID}/image.jpg`,
+        thumbnail_blob_key: `${SUBMISSION_ID}/${FILE_ID}/thumbnail.jpg`,
+        captured_date: '2026-08-24',
+        location_label: null,
+        exif_subset: {},
+      },
+      {
+        id: SECOND_FILE_ID,
+        submission_id: SUBMISSION_ID,
+        status: 'ready',
+        inbox_blob_key: `${SUBMISSION_ID}/${SECOND_FILE_ID}/image.jpg`,
+        thumbnail_blob_key: `${SUBMISSION_ID}/${SECOND_FILE_ID}/thumbnail.jpg`,
+        captured_date: '2026-08-24',
+        location_label: null,
+        exif_subset: {},
+      },
+    ]);
+    onDb(/SELECT COALESCE\(MAX\(sort_order\)/, [{ max_order: -1 }]);
+    onDb(/SELECT id FROM approved_file/, [{ id: FILE_ID }]);
+    onDb(/COUNT\(\*\) FILTER \(WHERE status = 'ready'\)/, [{ ready_count: 1, approved_count: 1 }]);
+    state.inboxStore.get.mockResolvedValue(Buffer.from('sanitized-image').buffer);
+    state.finalStore.set
+      .mockResolvedValueOnce({})
+      .mockRejectedValueOnce(new Error('temporary public blob failure'));
+
+    const response = await adminInboxHandler(
+      adminRequest('POST', {
+        action: 'approve',
+        submission_id: SUBMISSION_ID,
+        note_id: NOTE_ID,
+        files: [
+          { id: FILE_ID, captured_date: '2026-08-24' },
+          { id: SECOND_FILE_ID, captured_date: '2026-08-24' },
+        ],
+      })
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      ok: false,
+      approved: [{ file_id: FILE_ID }],
+      failures: [
+        {
+          file_id: SECOND_FILE_ID,
+          error: 'This photo could not be approved. It remains in the inbox to retry.',
+        },
+      ],
+      status: 'partial',
+    });
+    expect(state.finalStore.set).toHaveBeenCalledTimes(2);
+    expect(state.finalStore.delete).toHaveBeenCalledTimes(1);
+    expect(
+      state.dbCalls.some(
+        (call) =>
+          /UPDATE field_photo_submissions/.test(call.text) && call.values.includes('partial')
+      )
+    ).toBe(true);
+    const event = state.dbCalls.find((call) =>
+      /INSERT INTO field_photo_submission_events/.test(call.text)
+    );
+    expect(event?.values.some((value) => String(value).includes(SECOND_FILE_ID))).toBe(true);
   });
 
   it('retains a rejected photo key when private blob deletion fails', async () => {

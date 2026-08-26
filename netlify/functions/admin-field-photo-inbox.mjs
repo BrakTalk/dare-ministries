@@ -268,6 +268,21 @@ async function approveFiles(db, session, body) {
     return json({ error: 'The photo selection is invalid.' }, 400);
   }
 
+  const requestedFiles = new Map(
+    body.files.map((item) => [
+      item.id,
+      {
+        capturedDate: validatedDate(item.captured_date),
+        locationLabel: cleanText(item.location_label, 160),
+        alt: cleanText(item.alt, 300),
+        isCover: item.is_cover === true,
+      },
+    ])
+  );
+  if ([...requestedFiles.values()].some((item) => item.capturedDate === undefined)) {
+    return json({ error: 'A selected photo has an invalid capture date.' }, 400);
+  }
+
   const note = (await db.sql`SELECT id, status FROM field_notes WHERE id = ${body.note_id}`)[0];
   if (!note) return json({ error: 'Field Note not found.' }, 404);
 
@@ -292,91 +307,104 @@ async function approveFiles(db, session, body) {
   const inboxStore = getStore(FIELD_PHOTO_INBOX_STORE);
   const finalStore = getStore(FIELD_PHOTOS_STORE);
   const approved = [];
-  const requestedCover = body.files.find((item) => item.is_cover === true)?.id || null;
+  const failures = [];
+  const requestedCover =
+    body.files.find((item) => requestedFiles.get(item.id)?.isCover)?.id || null;
 
   for (const file of files) {
-    const item = body.files.find((candidate) => candidate.id === file.id);
-    const capturedDate = validatedDate(item.captured_date);
-    if (capturedDate === undefined) {
-      return json({ error: 'A selected photo has an invalid capture date.' }, 400);
-    }
-    const image = await inboxStore.get(file.inbox_blob_key, {
-      type: 'arrayBuffer',
-      consistency: 'strong',
-    });
-    if (!image) return json({ error: 'A selected photo is no longer available.' }, 409);
-
+    const item = requestedFiles.get(file.id);
     const photoId = randomUUID();
     const finalKey = `${body.note_id}/${photoId}`;
-    await finalStore.set(finalKey, image, { metadata: { contentType: 'image/jpeg' } });
     try {
-      const locationLabel = cleanText(item.location_label, 160);
-      const alt = cleanText(item.alt, 300);
+      const image = await inboxStore.get(file.inbox_blob_key, {
+        type: 'arrayBuffer',
+        consistency: 'strong',
+      });
+      if (!image) throw new Error('Private photo is unavailable.');
+
+      await finalStore.set(finalKey, image, { metadata: { contentType: 'image/jpeg' } });
       const coordinatorChangedMetadata =
-        capturedDate !== String(file.captured_date || '').slice(0, 10) ||
-        locationLabel !== (file.location_label || null);
-      await db.sql`
-        INSERT INTO field_note_photos (
-          id,
-          note_id,
-          content_type,
-          alt,
-          is_cover,
-          sort_order,
-          captured_at_local,
-          captured_offset_minutes,
-          captured_date,
-          location_label,
-          metadata_source
+        item.capturedDate !== String(file.captured_date || '').slice(0, 10) ||
+        item.locationLabel !== (file.location_label || null);
+      const promoted = await db.sql`
+        WITH inserted_photo AS (
+          INSERT INTO field_note_photos (
+            id,
+            note_id,
+            content_type,
+            alt,
+            is_cover,
+            sort_order,
+            captured_at_local,
+            captured_offset_minutes,
+            captured_date,
+            location_label,
+            metadata_source
+          )
+          SELECT
+            ${photoId},
+            ${body.note_id},
+            'image/jpeg',
+            ${item.alt},
+            FALSE,
+            ${sortOrder},
+            ${file.captured_at_local},
+            ${file.captured_offset_minutes},
+            ${item.capturedDate},
+            ${item.locationLabel},
+            ${coordinatorChangedMetadata ? 'coordinator' : Object.keys(file.exif_subset || {}).length ? 'exif' : 'email'}
+          WHERE EXISTS (
+            SELECT 1 FROM field_photo_submission_files
+            WHERE id = ${file.id}
+              AND submission_id = ${body.submission_id}
+              AND status = 'ready'
+          )
+          RETURNING id
+        ),
+        approved_file AS (
+          UPDATE field_photo_submission_files
+          SET
+            status = 'approved',
+            approved_photo_id = inserted_photo.id,
+            captured_date = ${item.capturedDate},
+            location_label = ${item.locationLabel},
+            alt = ${item.alt},
+            gps_latitude = NULL,
+            gps_longitude = NULL,
+            exif_subset = '{}'::JSONB,
+            updated_at = NOW()
+          FROM inserted_photo
+          WHERE field_photo_submission_files.id = ${file.id}
+            AND field_photo_submission_files.submission_id = ${body.submission_id}
+            AND field_photo_submission_files.status = 'ready'
+          RETURNING field_photo_submission_files.id
         )
-        VALUES (
-          ${photoId},
-          ${body.note_id},
-          'image/jpeg',
-          ${alt},
-          FALSE,
-          ${sortOrder},
-          ${file.captured_at_local},
-          ${file.captured_offset_minutes},
-          ${capturedDate},
-          ${locationLabel},
-          ${coordinatorChangedMetadata ? 'coordinator' : Object.keys(file.exif_subset || {}).length ? 'exif' : 'email'}
-        )
+        SELECT id FROM approved_file
       `;
-      await db.sql`
-        UPDATE field_photo_submission_files
-        SET
-          status = 'approved',
-          approved_photo_id = ${photoId},
-          captured_date = ${capturedDate},
-          location_label = ${locationLabel},
-          alt = ${alt},
-          gps_latitude = NULL,
-          gps_longitude = NULL,
-          exif_subset = '{}'::JSONB,
-          updated_at = NOW()
-        WHERE id = ${file.id} AND status = 'ready'
-      `;
+      if (!promoted.length) throw new Error('Photo is no longer ready for approval.');
+
       approved.push({ file_id: file.id, photo_id: photoId });
       sortOrder += 1;
-
-      // The sanitized final photo is now durable. Remove the private duplicate
-      // and thumbnail; if a transient delete fails, keep the keys in the row so
-      // the scheduled retention job can retry without exposing the objects.
-      const cleanup = await Promise.allSettled([
-        inboxStore.delete(file.inbox_blob_key),
-        file.thumbnail_blob_key ? inboxStore.delete(file.thumbnail_blob_key) : Promise.resolve(),
-      ]);
-      if (cleanup.every((result) => result.status === 'fulfilled')) {
-        await db.sql`
-          UPDATE field_photo_submission_files
-          SET inbox_blob_key = NULL, thumbnail_blob_key = NULL, updated_at = NOW()
-          WHERE id = ${file.id}
-        `;
-      }
-    } catch (error) {
+    } catch {
       await finalStore.delete(finalKey).catch(() => {});
-      throw error;
+      failures.push({
+        file_id: file.id,
+        error: 'This photo could not be approved. It remains in the inbox to retry.',
+      });
+      continue;
+    }
+
+    // The sanitized final photo is now durable. Remove the private duplicate
+    // and thumbnail; if a transient delete fails, keep the keys in the row so
+    // the scheduled retention job can retry without exposing the objects.
+    const privateKeys = [file.inbox_blob_key, file.thumbnail_blob_key].filter(Boolean);
+    const deletedKeys = await deleteBlobKeys(inboxStore, privateKeys);
+    if (deletedKeys.size === privateKeys.length) {
+      await db.sql`
+        UPDATE field_photo_submission_files
+        SET inbox_blob_key = NULL, thumbnail_blob_key = NULL, updated_at = NOW()
+        WHERE id = ${file.id}
+      `.catch(() => {});
     }
   }
 
@@ -391,37 +419,43 @@ async function approveFiles(db, session, body) {
     }
   }
 
-  const remaining = await db.sql`
-    SELECT COUNT(*)::INTEGER AS count
+  const counts = await db.sql`
+    SELECT
+      COUNT(*) FILTER (WHERE status = 'ready')::INTEGER AS ready_count,
+      COUNT(*) FILTER (WHERE status = 'approved')::INTEGER AS approved_count
     FROM field_photo_submission_files
-    WHERE submission_id = ${body.submission_id} AND status = 'ready'
+    WHERE submission_id = ${body.submission_id}
   `;
-  const status = Number(remaining[0]?.count || 0) ? 'partial' : 'approved';
-  await db.sql`
-    UPDATE field_photo_submissions
-    SET
-      status = ${status},
-      reviewed_by = ${session.profile.id},
-      reviewed_at = NOW(),
-      updated_at = NOW()
-    WHERE id = ${body.submission_id}
-  `;
-  await db.sql`
-    INSERT INTO field_photo_submission_events (
-      submission_id,
-      actor_profile_id,
-      action,
-      details
-    )
-    VALUES (
-      ${body.submission_id},
-      ${session.profile.id},
-      'approved',
-      ${JSON.stringify({ note_id: body.note_id, files: approved })}::JSONB
-    )
-  `;
-  if (note.status === 'published') await triggerBuild();
-  return json({ ok: true, approved, status });
+  const readyCount = Number(counts[0]?.ready_count || 0);
+  const approvedCount = Number(counts[0]?.approved_count || 0);
+  const status = approvedCount ? (readyCount ? 'partial' : 'approved') : 'ready';
+  if (approved.length) {
+    await db.sql`
+      UPDATE field_photo_submissions
+      SET
+        status = ${status},
+        reviewed_by = ${session.profile.id},
+        reviewed_at = NOW(),
+        updated_at = NOW()
+      WHERE id = ${body.submission_id}
+    `;
+    await db.sql`
+      INSERT INTO field_photo_submission_events (
+        submission_id,
+        actor_profile_id,
+        action,
+        details
+      )
+      VALUES (
+        ${body.submission_id},
+        ${session.profile.id},
+        'approved',
+        ${JSON.stringify({ note_id: body.note_id, files: approved, failures })}::JSONB
+      )
+    `;
+    if (note.status === 'published') await triggerBuild();
+  }
+  return json({ ok: failures.length === 0, approved, failures, status });
 }
 
 export default async (req) => {
