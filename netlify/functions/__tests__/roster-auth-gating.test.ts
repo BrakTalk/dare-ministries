@@ -49,6 +49,7 @@ vi.mock('@netlify/blobs', () => ({
 }));
 
 import contactsHandler from '../admin-contacts.mjs';
+import fieldPhotoInboxHandler from '../admin-field-photo-inbox.mjs';
 import fieldNotePhotosHandler from '../admin-field-note-photos.mjs';
 import fieldNotesHandler from '../admin-field-notes.mjs';
 import impactStatsHandler from '../admin-impact-stats.mjs';
@@ -61,6 +62,11 @@ const protectedHandlers: ProtectedHandler[] = [
   { name: 'contacts', path: '/api/admin/contacts', handler: contactsHandler },
   { name: 'impact statistics', path: '/api/admin/impact-stats', handler: impactStatsHandler },
   { name: 'field notes', path: '/api/admin/field-notes', handler: fieldNotesHandler },
+  {
+    name: 'field photo inbox',
+    path: '/api/admin/field-photo-inbox',
+    handler: fieldPhotoInboxHandler,
+  },
   {
     name: 'field-note photos',
     path: '/api/admin/field-note-photos',
@@ -293,7 +299,7 @@ describe('Phase: Protected handler propagation', () => {
       protectedHandlers.map(({ path, handler }) => handler(adminRequest(path, { method: 'HEAD' })))
     );
 
-    expect(responses.map((response) => response.status)).toEqual([405, 405, 405, 405, 405]);
+    expect(responses.map((response) => response.status)).toEqual([405, 405, 405, 405, 405, 405]);
     expect(state.getPortalSession).toHaveBeenCalledTimes(protectedHandlers.length);
     expect(state.getDatabase).toHaveBeenCalledTimes(4);
   });
@@ -305,7 +311,7 @@ describe('Phase: Protected handler propagation', () => {
       protectedHandlers.map(({ path, handler }) => handler(adminRequest(path, { method: 'HEAD' })))
     );
 
-    expect(responses.map((response) => response.status)).toEqual([403, 403, 403, 403, 403]);
+    expect(responses.map((response) => response.status)).toEqual([403, 403, 403, 403, 403, 403]);
     expect(state.getDatabase).not.toHaveBeenCalled();
     expect(state.getStore).not.toHaveBeenCalled();
   });

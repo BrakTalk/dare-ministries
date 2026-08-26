@@ -220,6 +220,19 @@ describe('Phase: Note save & publish (admin-field-notes)', () => {
     expect(res.status).toBe(400);
   });
 
+  it('❌ N4a rejects impossible start and end calendar dates', async () => {
+    const invalidStart = await notesHandler(
+      jsonReq('POST', { title: 'Trip', start_date: '2026-02-31' })
+    );
+    const invalidEnd = await notesHandler(
+      jsonReq('POST', { title: 'Trip', start_date: '2026-07-16', end_date: '2026-04-31' })
+    );
+
+    expect(invalidStart.status).toBe(400);
+    expect(invalidEnd.status).toBe(400);
+    expect(dbCall(/INSERT/)).toBeUndefined();
+  });
+
   it('⚠️ N5 retries a slug collision with a -2 suffix', async () => {
     let attempts = 0;
     onDb(/INSERT INTO field_notes/, (values) => {

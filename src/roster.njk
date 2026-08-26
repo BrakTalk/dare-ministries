@@ -54,6 +54,7 @@ eleventyExcludeFromCollections: true
       <button class="roster-tab" data-tab="contacts">Inbox <span id="unreadCount" class="tab-badge"></span></button>
       <button class="roster-tab" data-tab="stats">Impact Stats</button>
       <button class="roster-tab" data-tab="field-notes">Field Notes <span id="noteCount" class="tab-badge"></span></button>
+      <button class="roster-tab" data-tab="photo-inbox">Photo Inbox <span id="photoInboxCount" class="tab-badge"></span></button>
     </nav>
 
     <!-- Volunteers tab -->
@@ -126,6 +127,19 @@ eleventyExcludeFromCollections: true
       </div>
       <div class="roster-list" id="noteList"></div>
       <p id="noteEmpty" class="roster-empty hidden">No field notes yet. Write the first trip recap!</p>
+    </section>
+
+    <!-- Emailed photo moderation tab -->
+    <section id="tab-photo-inbox" class="roster-panel hidden">
+      <div class="roster-toolbar">
+        <div class="photo-inbox-intro">
+          <p class="roster-toolbar-hint">Review emailed photos before they are attached to a Field Note. Capture dates and approximate GPS groups come from private EXIF metadata; only coordinator-reviewed values leave the inbox.</p>
+          <p id="photoInboxAddress" class="photo-inbox-address"></p>
+        </div>
+        <button id="refreshPhotoInboxBtn" type="button" class="btn btn-outline btn-small">Refresh</button>
+      </div>
+      <div class="roster-list" id="photoInboxList"></div>
+      <p id="photoInboxEmpty" class="roster-empty hidden">No emailed photos are waiting for review.</p>
     </section>
   </main>
 
