@@ -84,10 +84,10 @@ export default async () => {
       updated_at = NOW()
     WHERE submission_id = ANY(${ids})
   `;
-  const newlyExpiredIds = submissions
-    .filter((submission) => submission.status !== 'rejected')
+  const unreviewedIds = submissions
+    .filter((submission) => !['partial', 'rejected'].includes(submission.status))
     .map((submission) => submission.id);
-  if (newlyExpiredIds.length) {
+  if (unreviewedIds.length) {
     await db.sql`
       UPDATE field_photo_submissions
       SET
@@ -95,13 +95,13 @@ export default async () => {
         failure_reason = 'Expired before coordinator review.',
         reviewed_at = NOW(),
         updated_at = NOW()
-      WHERE id = ANY(${newlyExpiredIds})
+      WHERE id = ANY(${unreviewedIds})
     `;
     await db.sql`
       INSERT INTO field_photo_submission_events (submission_id, action, details)
       SELECT expired.submission_id, 'expired',
         ${JSON.stringify({ retention_days: days })}::JSONB
-      FROM UNNEST(${newlyExpiredIds}::UUID[]) AS expired(submission_id)
+      FROM UNNEST(${unreviewedIds}::UUID[]) AS expired(submission_id)
     `;
   }
 };

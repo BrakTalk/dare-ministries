@@ -630,4 +630,27 @@ describe('Photo Inbox retention', () => {
       state.dbCalls.some((call) => /INSERT INTO field_photo_submission_events/.test(call.text))
     ).toBe(false);
   });
+
+  it('cleans residual private files without overwriting a partial review outcome', async () => {
+    onDb(/SELECT id, status FROM field_photo_submissions/, [
+      { id: SUBMISSION_ID, status: 'partial' },
+    ]);
+    onDb(/SELECT inbox_blob_key, thumbnail_blob_key/, [
+      {
+        inbox_blob_key: `${SUBMISSION_ID}/${FILE_ID}/image.jpg`,
+        thumbnail_blob_key: `${SUBMISSION_ID}/${FILE_ID}/thumbnail.jpg`,
+      },
+    ]);
+
+    await cleanupInboxHandler();
+
+    expect(state.inboxStore.delete).toHaveBeenCalledTimes(2);
+    expect(state.dbCalls.some((call) => /gps_latitude = NULL/.test(call.text))).toBe(true);
+    expect(state.dbCalls.some((call) => /UPDATE field_photo_submissions SET/.test(call.text))).toBe(
+      false
+    );
+    expect(
+      state.dbCalls.some((call) => /INSERT INTO field_photo_submission_events/.test(call.text))
+    ).toBe(false);
+  });
 });
