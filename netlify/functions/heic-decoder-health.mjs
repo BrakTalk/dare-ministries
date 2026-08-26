@@ -7,8 +7,18 @@ export const config = {
   includedFiles: ['./vendor/heic-decoder/**', './__tests__/fixtures/heic/no-exif.heic'],
 };
 
-export default async () => {
-  if (process.env.CONTEXT !== 'deploy-preview') {
+export const isDeployPreviewRequest = (request) => {
+  if (process.env.CONTEXT === 'deploy-preview') return true;
+
+  try {
+    return /^deploy-preview-\d+--[a-z0-9-]+\.netlify\.app$/i.test(new URL(request.url).hostname);
+  } catch {
+    return false;
+  }
+};
+
+export default async (request) => {
+  if (!isDeployPreviewRequest(request)) {
     return json({ error: 'Not found.' }, 404);
   }
 
