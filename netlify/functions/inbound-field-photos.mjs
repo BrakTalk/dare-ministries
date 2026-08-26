@@ -244,7 +244,7 @@ export default async (req) => {
   const recipients = configuredRecipients();
   if (!apiKey || !webhookSecret || !recipients.length) {
     console.error('Field photo intake is missing Resend or recipient configuration.');
-    return json({ error: 'Photo intake is not configured.' }, 503);
+    throw new Error('Field photo intake is not configured.');
   }
 
   const payload = await req.text();

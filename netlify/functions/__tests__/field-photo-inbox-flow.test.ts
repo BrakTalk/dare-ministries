@@ -202,6 +202,16 @@ beforeEach(() => {
 });
 
 describe('Resend field photo ingestion', () => {
+  it('fails the background invocation when required configuration is missing', async () => {
+    delete process.env.RESEND_API_KEY;
+
+    await expect(inboundHandler(webhookRequest())).rejects.toThrow(
+      'Field photo intake is not configured.'
+    );
+    expect(state.verify).not.toHaveBeenCalled();
+    expect(state.getDatabase).not.toHaveBeenCalled();
+  });
+
   it('rejects an invalid webhook before database or blob access', async () => {
     state.verify.mockImplementation(() => {
       throw new Error('bad signature');
