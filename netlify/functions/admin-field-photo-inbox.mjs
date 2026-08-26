@@ -16,6 +16,7 @@ import {
 import { getCoordinatorSession } from './lib/auth.mjs';
 import { requireSameOrigin } from './lib/portal-auth.mjs';
 import { coordinateGroupLabel } from './lib/field-photo-processing.mjs';
+import { deletePrivatePhotoBlobs } from './lib/field-photo-blob-cleanup.mjs';
 
 export const config = { path: '/api/admin/field-photo-inbox' };
 
@@ -176,22 +177,17 @@ async function rejectSubmission(db, session, submissionId) {
   if (!submissions.length) return json({ error: 'Submission not found or already closed.' }, 404);
 
   const files = await db.sql`
-    SELECT inbox_blob_key, thumbnail_blob_key
+    SELECT inbox_blob_key, thumbnail_blob_key, id
     FROM field_photo_submission_files
     WHERE submission_id = ${submissionId} AND status != 'approved'
   `;
   const store = getStore(FIELD_PHOTO_INBOX_STORE);
-  const keys = files
-    .flatMap((file) => [file.inbox_blob_key, file.thumbnail_blob_key])
-    .filter(Boolean);
-  await Promise.allSettled(keys.map((key) => store.delete(key)));
+  await deletePrivatePhotoBlobs(db, store, files);
 
   await db.sql`
       UPDATE field_photo_submission_files
     SET
       status = CASE WHEN status = 'approved' THEN status ELSE 'rejected' END,
-      inbox_blob_key = CASE WHEN status = 'approved' THEN inbox_blob_key ELSE NULL END,
-      thumbnail_blob_key = CASE WHEN status = 'approved' THEN thumbnail_blob_key ELSE NULL END,
       gps_latitude = CASE WHEN status = 'approved' THEN gps_latitude ELSE NULL END,
       gps_longitude = CASE WHEN status = 'approved' THEN gps_longitude ELSE NULL END,
       exif_subset = CASE WHEN status = 'approved' THEN exif_subset ELSE '{}'::JSONB END,

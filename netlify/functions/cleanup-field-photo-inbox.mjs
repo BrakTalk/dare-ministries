@@ -4,9 +4,9 @@
 import { getDatabase } from '@netlify/database';
 import { getStore } from '@netlify/blobs';
 import { FIELD_PHOTO_INBOX_STORE } from './lib/helpers.mjs';
+import { deletePrivatePhotoBlobs } from './lib/field-photo-blob-cleanup.mjs';
 
 export const config = { schedule: '@daily' };
-const DELETE_BATCH_SIZE = 25;
 
 function retentionDays() {
   const configured = Number(process.env.FIELD_PHOTO_INBOX_RETENTION_DAYS || 30);
@@ -16,6 +16,18 @@ function retentionDays() {
 export default async () => {
   const db = getDatabase();
   const days = retentionDays();
+  const store = getStore(FIELD_PHOTO_INBOX_STORE);
+
+  // Approval and rejection keep a private key whenever immediate deletion
+  // fails. Retry those terminal rows without changing their audit status.
+  const terminalFiles = await db.sql`
+    SELECT id, inbox_blob_key, thumbnail_blob_key
+    FROM field_photo_submission_files
+    WHERE status IN ('approved', 'rejected')
+      AND (inbox_blob_key IS NOT NULL OR thumbnail_blob_key IS NOT NULL)
+  `;
+  await deletePrivatePhotoBlobs(db, store, terminalFiles);
+
   const submissions = await db.sql`
     SELECT id
     FROM field_photo_submissions
@@ -26,35 +38,23 @@ export default async () => {
 
   const ids = submissions.map((submission) => submission.id);
   const files = await db.sql`
-    SELECT inbox_blob_key, thumbnail_blob_key
+    SELECT inbox_blob_key, thumbnail_blob_key, id
     FROM field_photo_submission_files
     WHERE submission_id = ANY(${ids})
   `;
-  const store = getStore(FIELD_PHOTO_INBOX_STORE);
-  const keys = files
-    .flatMap((file) => [file.inbox_blob_key, file.thumbnail_blob_key])
-    .filter(Boolean);
-  for (let index = 0; index < keys.length; index += DELETE_BATCH_SIZE) {
-    await Promise.allSettled(
-      keys.slice(index, index + DELETE_BATCH_SIZE).map((key) => store.delete(key))
-    );
-  }
+  await deletePrivatePhotoBlobs(db, store, files);
 
   await db.sql`
     UPDATE field_photo_submission_files
     SET
-      status = CASE WHEN status = 'approved' THEN status ELSE 'rejected' END,
-      inbox_blob_key = NULL,
-      thumbnail_blob_key = NULL,
+      status = 'rejected',
       gps_latitude = NULL,
       gps_longitude = NULL,
       exif_subset = '{}'::JSONB,
-      failure_reason = CASE
-        WHEN status = 'approved' THEN failure_reason
-        ELSE 'Expired before coordinator review.'
-      END,
+      failure_reason = 'Expired before coordinator review.',
       updated_at = NOW()
     WHERE submission_id = ANY(${ids})
+      AND status != 'approved'
   `;
   await db.sql`
     UPDATE field_photo_submissions
